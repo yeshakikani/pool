@@ -1048,7 +1048,8 @@ const PoolGame = () => {
                 onClick={() => setGameMode(null)}
                 className="text-white/30 hover:text-white font-bold transition-all text-xs uppercase tracking-[0.3em] pt-4"
               >
-                Exit to Menu
+                Exit to
+
               </button>
             </div>
           </div>
