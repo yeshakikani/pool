@@ -112,7 +112,6 @@ const PoolGame = () => {
         if (Math.abs(this.vy) < 0.05) this.vy = 0;
 
         // 2. Check for Pockets with updated position
-        let isOverPocket = false;
         let isNearPocketArea = false;
 
         for (const pocket of pockets) {
@@ -124,12 +123,13 @@ const PoolGame = () => {
           if (dist < POCKET_RADIUS) {
             this.pocketed = true;
             ballPocketed = true;
-            isOverPocket = true;
 
             if (this.number === 0) {
               winnerState = currentPlayerState === 1 ? 2 : 1;
               messageState = `GAME OVER! Cue ball pocketed. Player ${winnerState} wins!`;
-              setGameState(prev => ({ ...prev, winner: winnerState, message: messageState }));
+              const snapWinner = winnerState;
+              const snapMessage = messageState;
+              setGameState(prev => ({ ...prev, winner: snapWinner, message: snapMessage }));
             } else if (this.number === 8) {
               handleEightBall();
             } else {
@@ -358,13 +358,15 @@ const PoolGame = () => {
       }
 
       // Try different angles
+      const currentCueBall = cueBall;
+      const currentPockets = pockets;
       for (let i = 0; i < 36; i++) {
         const angle = (i / 36) * Math.PI * 2;
         let score = 0;
 
         targetBalls.forEach(ball => {
-          const dx = ball.x - cueBall.x;
-          const dy = ball.y - cueBall.y;
+          const dx = ball.x - currentCueBall.x;
+          const dy = ball.y - currentCueBall.y;
           const angleToBall = Math.atan2(dy, dx);
           const angleDiff = Math.abs(angleToBall - angle);
 
@@ -373,7 +375,7 @@ const PoolGame = () => {
             score += 100 / (dist + 1);
 
             // Bonus for closer to pockets
-            pockets.forEach(pocket => {
+            currentPockets.forEach(pocket => {
               const pdx = ball.x - pocket.x;
               const pdy = ball.y - pocket.y;
               const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
