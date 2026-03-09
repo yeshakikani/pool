@@ -26,12 +26,57 @@ const PoolGame = () => {
     currentPlayer: 1,
     player1Balls: [],
     player2Balls: [],
+    pocketedBalls: [],
     player1Type: null,
     player2Type: null,
     winner: null,
     message: 'Player 1: Break the rack!'
   });
   const [currentPower, setCurrentPower] = useState(0);
+  const [turnTimeLeft, setTurnTimeLeft] = useState(30);
+  const [timerActive, setTimerActive] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(false);
+  const [isMobileLandscape, setIsMobileLandscape] = useState(false);
+  const forceSkipTurnRef = useRef(false);
+
+  // Turner Timer Effect
+  useEffect(() => {
+    let interval;
+    if (timerActive && turnTimeLeft > 0) {
+      interval = setInterval(() => {
+        setTurnTimeLeft(prev => {
+          if (prev <= 1) {
+            forceSkipTurnRef.current = true;
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 3000);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [timerActive, turnTimeLeft]);
+
+  // Orientation Check Effect
+  useEffect(() => {
+    const checkOrientation = () => {
+      const portrait = window.innerHeight > window.innerWidth;
+      const smallScreen = window.innerWidth < 1024;
+      setIsPortrait(portrait && smallScreen);
+      // Mobile landscape: landscape + small phone screen (height < 500px)
+      const mobileLandscape = !portrait && window.innerHeight < 500 && window.innerWidth < 1024;
+      setIsMobileLandscape(mobileLandscape);
+    };
+
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+    return () => {
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
+    };
+  }, []);
 
   useEffect(() => {
     if (!gameMode) return;
@@ -51,6 +96,7 @@ const PoolGame = () => {
     let pockets = [];
     let cueBall = null;
     let ballsMoving = false;
+    let turnTimerExpired = false;
     let aimAngle = 0;
     let power = 0;
     let isDragging = false;
@@ -65,8 +111,11 @@ const PoolGame = () => {
     let shotTaken = false;
     let ballPocketed = false;
     let foul = false;
+    let pocketedBallsState = [];
     let aiThinking = false;
     let aiThinkTimer = 0;
+    let aiPhase = 'aim'; // 'aim' | 'pullback' | 'fire'
+    let aiPullback = 0;   // 0-100, current pullback amount
     let winnerState = null;
 
     const initPockets = () => {
@@ -125,11 +174,17 @@ const PoolGame = () => {
             ballPocketed = true;
 
             if (this.number === 0) {
-              winnerState = currentPlayerState === 1 ? 2 : 1;
-              messageState = `GAME OVER! Cue ball pocketed. Player ${winnerState} wins!`;
-              const snapWinner = winnerState;
-              const snapMessage = messageState;
-              setGameState(prev => ({ ...prev, winner: snapWinner, message: snapMessage }));
+              // Cue ball pocketed = scratch/foul, NOT game over
+              foul = true;
+              // Respawn cue ball after a short delay
+              setTimeout(() => {
+                this.pocketed = false;
+                this.pocketScale = 1;
+                this.x = TABLE_WIDTH / 4;
+                this.y = TABLE_HEIGHT / 2;
+                this.vx = 0;
+                this.vy = 0;
+              }, 500);
             } else if (this.number === 8) {
               handleEightBall();
             } else {
@@ -204,16 +259,16 @@ const PoolGame = () => {
         ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
         ctx.fill();
 
-        if (this.number > 8 && this.number !== 0) {
+        if (this.number !== 0) {
+          // 1. WHITE DISK FOR NUMBER (Provides maximum contrast for all balls)
           ctx.fillStyle = '#FFFFFF';
           ctx.beginPath();
-          ctx.arc(this.x, this.y, r * 0.65, 0, Math.PI * 2);
+          ctx.arc(this.x, this.y, r * 0.55, 0, Math.PI * 2);
           ctx.fill();
-        }
 
-        if (this.number !== 0) {
-          ctx.fillStyle = (this.number > 8 || this.number === 8) ? '#000000' : '#FFFFFF';
-          ctx.font = `bold ${Math.floor(r * 0.8)}px Arial`;
+          // 2. SHARP BLACK NUMBER
+          ctx.fillStyle = '#000000';
+          ctx.font = `bold ${Math.floor(r * 0.85)}px Arial`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(this.number, this.x, this.y);
@@ -235,6 +290,11 @@ const PoolGame = () => {
     const handleBallPocketed = (ballNum) => {
       const isStripe = ballNum > 8;
 
+      // Track this ball as pocketed for scoreboard highlight
+      if (!pocketedBallsState.includes(ballNum)) {
+        pocketedBallsState.push(ballNum);
+      }
+
       if (currentPlayerState === 1) {
         if (player1TypeState === null) {
           player1TypeState = isStripe ? 'stripe' : 'solid';
@@ -244,6 +304,7 @@ const PoolGame = () => {
           player1BallsState.push(ballNum);
         } else {
           player2BallsState.push(ballNum);
+          foul = true; // Pocketed opponent's ball — turn switches
         }
       } else {
         if (player2TypeState === null) {
@@ -254,6 +315,7 @@ const PoolGame = () => {
           player2BallsState.push(ballNum);
         } else {
           player1BallsState.push(ballNum);
+          foul = true; // Pocketed opponent's ball — turn switches
         }
       }
     };
@@ -265,11 +327,9 @@ const PoolGame = () => {
       if (currentBalls.length === requiredBalls) {
         winnerState = currentPlayerState;
         messageState = `GAME OVER! 8-Ball pocketed! Player ${winnerState} wins!`;
-        setGameState(prev => ({ ...prev, winner: winnerState, message: messageState }));
       } else {
         winnerState = currentPlayerState === 1 ? 2 : 1;
         messageState = `GAME OVER! 8-Ball pocketed early. Player ${winnerState} wins!`;
-        setGameState(prev => ({ ...prev, winner: winnerState, message: messageState }));
       }
     };
 
@@ -336,14 +396,13 @@ const PoolGame = () => {
     };
 
     // AI Player Logic
-    const aiTakeShot = () => {
-      if (!cueBall || cueBall.pocketed) return;
+    const aiComputeAngle = () => {
+      if (!cueBall || cueBall.pocketed) return 0;
 
       let bestAngle = 0;
       let bestScore = -1;
       const myType = player2TypeState;
 
-      // Find target balls
       const targetBalls = balls.filter(b => {
         if (b.pocketed || b.number === 0) return false;
         if (!myType) return b.number !== 8;
@@ -351,13 +410,11 @@ const PoolGame = () => {
         return b.number > 8;
       });
 
-      // If no target balls, aim for 8-ball
       if (targetBalls.length === 0) {
         const eightBall = balls.find(b => b.number === 8 && !b.pocketed);
         if (eightBall) targetBalls.push(eightBall);
       }
 
-      // Try different angles
       const currentCueBall = cueBall;
       const currentPockets = pockets;
       for (let i = 0; i < 36; i++) {
@@ -374,7 +431,6 @@ const PoolGame = () => {
             const dist = Math.sqrt(dx * dx + dy * dy);
             score += 100 / (dist + 1);
 
-            // Bonus for closer to pockets
             currentPockets.forEach(pocket => {
               const pdx = ball.x - pocket.x;
               const pdy = ball.y - pocket.y;
@@ -389,8 +445,12 @@ const PoolGame = () => {
           bestAngle = angle;
         }
       }
+      return bestAngle;
+    };
 
-      aimAngle = bestAngle;
+    const aiTakeShot = () => {
+      if (!cueBall || cueBall.pocketed) return;
+
       const aiPower = 40 + Math.random() * 30;
       const speed = aiPower / 4;
 
@@ -399,77 +459,71 @@ const PoolGame = () => {
       ballsMoving = true;
       shotTaken = true;
       aiThinking = false;
+      aiPhase = 'aim';
+      aiPullback = 0;
     };
 
     const drawTable = () => {
-      // Main wood rail
-      const railGradient = ctx.createLinearGradient(0, 0, 0, TABLE_HEIGHT);
-      railGradient.addColorStop(0, '#5D2E1A');
-      railGradient.addColorStop(0.5, '#7B3F24');
-      railGradient.addColorStop(1, '#5D2E1A');
+      const railWidth = 35;
+
+      // 1. CHARCOAL SLATE RAILS (High contrast against blue background)
+      const railGradient = ctx.createLinearGradient(0, 0, TABLE_WIDTH, TABLE_HEIGHT);
+      railGradient.addColorStop(0, '#1e1e1e');
+      railGradient.addColorStop(0.5, '#2d2d2d');
+      railGradient.addColorStop(1, '#1e1e1e');
       ctx.fillStyle = railGradient;
       ctx.fillRect(0, 0, TABLE_WIDTH, TABLE_HEIGHT);
 
-      // Blue Table Cloth
-      ctx.fillStyle = '#21618C'; // Deep blue cloth
-      ctx.fillRect(35, 35, TABLE_WIDTH - 70, TABLE_HEIGHT - 70);
+      // Subtle Metallic Sheen on rails
+      ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(2, 2, TABLE_WIDTH - 4, TABLE_HEIGHT - 4);
 
-      // Subtle texture for cloth
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-      for (let i = 0; i < 30; i++) {
-        const x = Math.random() * (TABLE_WIDTH - 70) + 35;
-        const y = Math.random() * (TABLE_HEIGHT - 70) + 35;
-        ctx.fillRect(x, y, 1, 1);
-      }
+      // 2. LUXURY EMERALD CLOTH (Contrast with background)
+      const clothGradient = ctx.createRadialGradient(
+        TABLE_WIDTH / 2, TABLE_HEIGHT / 2, 0,
+        TABLE_WIDTH / 2, TABLE_HEIGHT / 2, TABLE_WIDTH / 2
+      );
+      clothGradient.addColorStop(0, '#10b981'); // Vibrant Emerald Center
+      clothGradient.addColorStop(1, '#064e3b'); // Deep Forest Edge
+      ctx.fillStyle = clothGradient;
+      ctx.fillRect(railWidth, railWidth, TABLE_WIDTH - railWidth * 2, TABLE_HEIGHT - railWidth * 2);
 
-      // Inner Rail Shadow
-      ctx.strokeStyle = '#3E1F11';
-      ctx.lineWidth = 14;
-      ctx.strokeRect(42, 42, TABLE_WIDTH - 84, TABLE_HEIGHT - 84);
-
-      // Rail markings (Dots)
-      ctx.fillStyle = '#ECF0F1';
+      // 3. MINimalist SILVER DOTS
+      ctx.fillStyle = '#e2e8f0';
       for (let i = 1; i < 4; i++) {
-        // Top dots
-        ctx.beginPath(); ctx.arc(TABLE_WIDTH / 4 * i, 18, 3, 0, Math.PI * 2); ctx.fill();
-        // Bottom dots
-        ctx.beginPath(); ctx.arc(TABLE_WIDTH / 4 * i, TABLE_HEIGHT - 18, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(TABLE_WIDTH / 4 * i, railWidth / 2, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(TABLE_WIDTH / 4 * i, TABLE_HEIGHT - railWidth / 2, 2.5, 0, Math.PI * 2); ctx.fill();
       }
 
+      // 4. POCKETS (Deep Shadow)
       pockets.forEach(pocket => {
-        const pocketGradient = ctx.createRadialGradient(
-          pocket.x, pocket.y, 0,
-          pocket.x, pocket.y, POCKET_RADIUS
-        );
+        const pocketGradient = ctx.createRadialGradient(pocket.x, pocket.y, 0, pocket.x, pocket.y, POCKET_RADIUS);
         pocketGradient.addColorStop(0, '#000000');
-        pocketGradient.addColorStop(0.8, '#1a1a1a');
-        pocketGradient.addColorStop(1, '#333333');
-
+        pocketGradient.addColorStop(1, '#0f172a');
         ctx.fillStyle = pocketGradient;
         ctx.beginPath();
         ctx.arc(pocket.x, pocket.y, POCKET_RADIUS, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.strokeStyle = '#4a3010';
-        ctx.lineWidth = 3;
+        // Polished Rim
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(pocket.x, pocket.y, POCKET_RADIUS, 0, Math.PI * 2);
         ctx.stroke();
       });
 
-      // Baulk line
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(TABLE_WIDTH / 4, 45);
-      ctx.lineTo(TABLE_WIDTH / 4, TABLE_HEIGHT - 45);
-      ctx.stroke();
+      // No Baulk line as requested
     };
 
     const drawCue = () => {
       if (ballsMoving || !cueBall || cueBall.pocketed) return;
-      if (gameMode === 'pvc' && currentPlayerState === 2) return;
+      if (gameMode === 'pvc' && currentPlayerState === 2 && !aiThinking) return;
 
-      const cueLength = 350;
-      const cueDistance = 50 + power * 1.5;
+      const cueLength = 360;
+      const effectivePower = (gameMode === 'pvc' && currentPlayerState === 2) ? aiPullback : power;
+      const cueDistance = 45 + effectivePower * 1.5;
 
       const tipX = cueBall.x - Math.cos(aimAngle) * cueDistance;
       const tipY = cueBall.y - Math.sin(aimAngle) * cueDistance;
@@ -478,95 +532,110 @@ const PoolGame = () => {
 
       ctx.save();
 
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-      ctx.lineWidth = 10;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(endX + 3, endY + 3);
-      ctx.lineTo(tipX + 3, tipY + 3);
-      ctx.stroke();
-
+      // CUE BODY (Polished Modern look)
       const cueGradient = ctx.createLinearGradient(endX, endY, tipX, tipY);
-      cueGradient.addColorStop(0, '#8B4513');
-      cueGradient.addColorStop(0.3, '#A0522D');
-      cueGradient.addColorStop(0.7, '#D2691E');
-      cueGradient.addColorStop(0.85, '#F5DEB3');
-      cueGradient.addColorStop(1, '#FFFFFF');
+      cueGradient.addColorStop(0, '#0f172a');
+      cueGradient.addColorStop(0.4, '#1e293b');
+      cueGradient.addColorStop(0.8, '#f8fafc'); // White shaft
+      cueGradient.addColorStop(1, '#3b82f6');   // Blue Tip
 
       ctx.strokeStyle = cueGradient;
-      ctx.lineWidth = 9;
-      ctx.lineCap = 'round';
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'butt';
       ctx.beginPath();
       ctx.moveTo(endX, endY);
       ctx.lineTo(tipX, tipY);
       ctx.stroke();
 
-      ctx.strokeStyle = 'rgba(139, 69, 19, 0.3)';
-      ctx.lineWidth = 1;
-      for (let i = 0; i < 5; i++) {
-        const offset = (i - 2) * 2;
-        ctx.beginPath();
-        ctx.moveTo(endX + offset, endY + offset);
-        ctx.lineTo(tipX + offset, tipY + offset);
-        ctx.stroke();
-      }
-
-      ctx.fillStyle = '#4169E1';
-      ctx.beginPath();
-      ctx.arc(tipX, tipY, 5, 0, Math.PI * 2);
-      ctx.fill();
-
       ctx.restore();
 
-      if (power === 0) {
+      // Show aim line
+      const isAiAiming = gameMode === 'pvc' && currentPlayerState === 2 && aiThinking && aiPhase === 'aim';
+      const isHumanTurn = (currentPlayerState === 1) || (gameMode === 'pvp' && currentPlayerState === 2);
+      if (power === 0 && (isHumanTurn || isAiAiming)) {
         ctx.save();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([8, 8]);
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-        ctx.shadowBlur = 5;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([5, 5]);
 
-        ctx.beginPath();
-        ctx.moveTo(cueBall.x, cueBall.y);
+        const rayDx = Math.cos(aimAngle);
+        const rayDy = Math.sin(aimAngle);
 
-        let lineEndX = cueBall.x;
-        let lineEndY = cueBall.y;
         let hitBall = null;
+        let hitDist = Infinity;
+        const collisionRadius = BALL_RADIUS * 2;
 
         for (let i = 1; i < balls.length; i++) {
           const ball = balls[i];
           if (ball.pocketed) continue;
-
-          const dx = ball.x - cueBall.x;
-          const dy = ball.y - cueBall.y;
-          const angle = Math.atan2(dy, dx);
-          const angleDiff = Math.abs(angle - aimAngle);
-
-          if (angleDiff < 0.2) {
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 300) {
+          const ocx = ball.x - cueBall.x;
+          const ocy = ball.y - cueBall.y;
+          const projLen = ocx * rayDx + ocy * rayDy;
+          if (projLen < 0) continue;
+          const perpX = ocx - projLen * rayDx;
+          const perpY = ocy - projLen * rayDy;
+          const perpDist = Math.sqrt(perpX * perpX + perpY * perpY);
+          if (perpDist < collisionRadius) {
+            const halfChord = Math.sqrt(collisionRadius * collisionRadius - perpDist * perpDist);
+            const hitT = projLen - halfChord;
+            if (hitT > 0 && hitT < hitDist) {
+              hitDist = hitT;
               hitBall = ball;
-              lineEndX = ball.x - Math.cos(aimAngle) * (BALL_RADIUS * 2);
-              lineEndY = ball.y - Math.sin(aimAngle) * (BALL_RADIUS * 2);
-              break;
             }
           }
         }
 
-        if (!hitBall) {
-          lineEndX = cueBall.x + Math.cos(aimAngle) * 250;
-          lineEndY = cueBall.y + Math.sin(aimAngle) * 250;
+        let lineEndX, lineEndY;
+        if (hitBall) {
+          lineEndX = cueBall.x + rayDx * hitDist;
+          lineEndY = cueBall.y + rayDy * hitDist;
+        } else {
+          lineEndX = cueBall.x + rayDx * 300;
+          lineEndY = cueBall.y + rayDy * 300;
         }
 
+        // Draw the main aim line
+        ctx.beginPath();
+        ctx.moveTo(cueBall.x, cueBall.y);
         ctx.lineTo(lineEndX, lineEndY);
         ctx.stroke();
 
         if (hitBall) {
-          ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
-          ctx.setLineDash([5, 5]);
+          // 1. GHOST BALL (Where the cue ball will be at impact)
+          ctx.setLineDash([]); // Solid line for ghost ball
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(lineEndX, lineEndY, BALL_RADIUS, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // 2. TARGET BALL PATH (Trajectory of the ball being hit)
+          const targetPathDx = hitBall.x - lineEndX;
+          const targetPathDy = hitBall.y - lineEndY;
+          const targetPathLen = Math.sqrt(targetPathDx * targetPathDx + targetPathDy * targetPathDy);
+          const targetUnitX = targetPathDx / targetPathLen;
+          const targetUnitY = targetPathDy / targetPathLen;
+
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
           ctx.beginPath();
           ctx.moveTo(hitBall.x, hitBall.y);
-          ctx.lineTo(hitBall.x + Math.cos(aimAngle) * 150, hitBall.y + Math.sin(aimAngle) * 150);
+          ctx.lineTo(hitBall.x + targetUnitX * 120, hitBall.y + targetUnitY * 120);
+          ctx.stroke();
+
+          // 3. CUE BALL DEFLECTION (90 degrees to the target path)
+          // The cue ball deflects along the tangent line
+          const deflectionX = -targetUnitY;
+          const deflectionY = targetUnitX;
+
+          // Determine which side to deflect based on the original ray direction
+          const dotProduct = rayDx * deflectionX + rayDy * deflectionY;
+          const side = dotProduct > 0 ? 1 : -1;
+
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+          ctx.beginPath();
+          ctx.moveTo(lineEndX, lineEndY);
+          ctx.lineTo(lineEndX + deflectionX * side * 80, lineEndY + deflectionY * side * 80);
           ctx.stroke();
         }
 
@@ -576,7 +645,9 @@ const PoolGame = () => {
 
     const drawPowerMeter = () => {
       if (ballsMoving || !cueBall || cueBall.pocketed) return;
-      if (gameMode === 'pvc' && currentPlayerState === 2) return;
+      // Show for player when they drag, OR for AI during pullback phase
+      const isAiPullingBack = gameMode === 'pvc' && currentPlayerState === 2 && aiThinking && aiPhase === 'pullback';
+      if (gameMode === 'pvc' && currentPlayerState === 2 && !isAiPullingBack) return;
 
       const meterX = 10;
       const meterY = TABLE_HEIGHT / 2 - 120;
@@ -589,7 +660,9 @@ const PoolGame = () => {
       ctx.fillStyle = 'rgba(20, 20, 20, 0.9)';
       ctx.fillRect(meterX, meterY, meterWidth, meterHeight);
 
-      const powerHeight = (power / 100) * meterHeight;
+      // Use aiPullback when it's AI's turn, otherwise player's power
+      const displayPower = (gameMode === 'pvc' && currentPlayerState === 2) ? aiPullback : power;
+      const powerHeight = (displayPower / 100) * meterHeight;
       const gradient = ctx.createLinearGradient(meterX, meterY + meterHeight, meterX, meterY);
       gradient.addColorStop(0, '#00FF00');
       gradient.addColorStop(0.4, '#FFFF00');
@@ -621,8 +694,8 @@ const PoolGame = () => {
       ctx.textAlign = 'center';
       ctx.shadowColor = '#000000';
       ctx.shadowBlur = 3;
-      ctx.fillText('POWER', meterX + meterWidth / 2, meterY - 10);
-      ctx.fillText(`${Math.floor(power)}%`, meterX + meterWidth / 2, meterY + meterHeight + 15);
+      ctx.fillText((gameMode === 'pvc' && currentPlayerState === 2) ? 'AI PWR' : 'POWER', meterX + meterWidth / 2, meterY - 10);
+      ctx.fillText(`${Math.floor(displayPower)}%`, meterX + meterWidth / 2, meterY + meterHeight + 15);
       ctx.shadowBlur = 0;
     };
 
@@ -659,13 +732,25 @@ const PoolGame = () => {
 
       ballsMoving = balls.some(ball => !ball.pocketed && (Math.abs(ball.vx) > 0.01 || Math.abs(ball.vy) > 0.01));
 
-      if (!ballsMoving && shotTaken) {
+      // Handle timer expiry from React state via ref
+      if (forceSkipTurnRef.current) {
+        forceSkipTurnRef.current = false;
+        turnTimerExpired = true;
+      }
+
+      if ((!ballsMoving && shotTaken) || (!ballsMoving && !shotTaken && turnTimerExpired)) {
+        const isTimerSkip = !shotTaken && turnTimerExpired;
+        turnTimerExpired = false;
         shotTaken = false;
 
-        if (foul || !ballPocketed) {
+        if (isTimerSkip || foul || !ballPocketed) {
           currentPlayerState = currentPlayerState === 1 ? 2 : 1;
-          messageState = foul ? `Foul! Player ${currentPlayerState}'s turn` :
-            (gameMode === 'pvc' && currentPlayerState === 2 ? "AI's turn" : `Player ${currentPlayerState}'s turn`);
+          if (isTimerSkip) {
+            messageState = `Time's up! Player ${currentPlayerState}'s turn`;
+          } else {
+            messageState = foul ? `Foul! Player ${currentPlayerState}'s turn` :
+              (gameMode === 'pvc' && currentPlayerState === 2 ? "AI's turn" : `Player ${currentPlayerState}'s turn`);
+          }
         } else {
           messageState = gameMode === 'pvc' && currentPlayerState === 2 ?
             'Good shot! AI continues' : `Good shot! Player ${currentPlayerState} continues`;
@@ -678,11 +763,22 @@ const PoolGame = () => {
           currentPlayer: currentPlayerState,
           player1Balls: [...player1BallsState],
           player2Balls: [...player2BallsState],
+          pocketedBalls: [...pocketedBallsState],
           player1Type: player1TypeState,
           player2Type: player2TypeState,
           winner: winnerState,
           message: messageState
         });
+
+        // Reset timer for next player (only if not AI)
+        const isAiTurn = gameMode === 'pvc' && currentPlayerState === 2;
+        if (!winnerState && !isAiTurn) {
+          setTimerActive(true);
+          setTurnTimeLeft(30);
+        } else {
+          setTimerActive(false);
+          setTurnTimeLeft(30);
+        }
 
         // AI turn
         if (gameMode === 'pvc' && currentPlayerState === 2 && !winnerState) {
@@ -691,10 +787,26 @@ const PoolGame = () => {
         }
       }
 
-      // AI thinking delay
+      // AI thinking / cue animation sequence
       if (aiThinking && !ballsMoving && !winnerState) {
         aiThinkTimer++;
-        if (aiThinkTimer > 90) {
+
+        if (aiPhase === 'aim') {
+          // Phase 1 (0-40 frames): compute angle once, show cue aiming at target
+          if (aiThinkTimer === 1) {
+            aimAngle = aiComputeAngle();
+          }
+          if (aiThinkTimer > 40) {
+            aiPhase = 'pullback';
+          }
+        } else if (aiPhase === 'pullback') {
+          // Phase 2 (40-100 frames): animate cue pulling back
+          aiPullback = Math.min(100, aiPullback + 2.5);
+          if (aiPullback >= 100) {
+            aiPhase = 'fire';
+          }
+        } else if (aiPhase === 'fire') {
+          // Phase 3: fire!
           aiTakeShot();
         }
       }
@@ -722,6 +834,11 @@ const PoolGame = () => {
       };
     };
 
+    // Touch aim: tracks the starting touch position for angle, then drag for power
+    let touchAimX = 0;
+    let touchAimY = 0;
+    let touchStarted = false;
+
     const handleMove = (e) => {
       if (gameMode === 'pvc' && currentPlayerState === 2) return;
       if (e.type === 'touchmove') e.preventDefault();
@@ -730,21 +847,44 @@ const PoolGame = () => {
       mouseX = pos.x;
       mouseY = pos.y;
 
-      if (!ballsMoving && cueBall && !cueBall.pocketed && !isDragging) {
-        const dx = mouseX - cueBall.x;
-        const dy = mouseY - cueBall.y;
-        aimAngle = Math.atan2(dy, dx);
-      }
+      const isTouch = e.touches !== undefined;
 
-      if (isDragging) {
-        const dx = mouseX - cueBall.x;
-        const dy = mouseY - cueBall.y;
-        const angleToMouse = Math.atan2(dy, dx);
-        const angleDiff = angleToMouse - aimAngle;
-
-        const distAlongLine = Math.cos(angleDiff) * Math.sqrt(dx * dx + dy * dy);
-        power = Math.min(100, Math.max(0, (150 - distAlongLine) / 1.5));
-        setCurrentPower(power);
+      if (!ballsMoving && cueBall && !cueBall.pocketed) {
+        if (isTouch) {
+          // For touch: always update aimAngle until dragging starts
+          // Once isDragging, aim is locked and we compute power from pullback
+          if (!isDragging) {
+            // Aim phase: finger moves around — update aim direction from cue ball to finger
+            const dx = mouseX - cueBall.x;
+            const dy = mouseY - cueBall.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > 5) {
+              aimAngle = Math.atan2(dy, dx);
+            }
+          } else {
+            // Drag/power phase: finger moved far enough from initial touch — compute pullback
+            const dx = mouseX - cueBall.x;
+            const dy = mouseY - cueBall.y;
+            // Dot product with OPPOSITE of aimAngle → how far behind the ball the finger is
+            const pullBack = -(dx * Math.cos(aimAngle) + dy * Math.sin(aimAngle));
+            power = Math.min(100, Math.max(0, pullBack / 1.5));
+            setCurrentPower(power);
+          }
+        } else {
+          // Mouse: freely update aim angle on hover
+          if (!isDragging) {
+            const dx = mouseX - cueBall.x;
+            const dy = mouseY - cueBall.y;
+            aimAngle = Math.atan2(dy, dx);
+          } else {
+            // Mouse drag: compute power from pullback
+            const dx = mouseX - cueBall.x;
+            const dy = mouseY - cueBall.y;
+            const pullBack = -(dx * Math.cos(aimAngle) + dy * Math.sin(aimAngle));
+            power = Math.min(100, Math.max(0, pullBack / 1.5));
+            setCurrentPower(power);
+          }
+        }
       }
     };
 
@@ -756,24 +896,91 @@ const PoolGame = () => {
       mouseY = pos.y;
 
       if (!ballsMoving && cueBall && !cueBall.pocketed) {
+        const isTouch = e.touches !== undefined;
+        if (isTouch) {
+          // Touch: set aim angle from initial touch position (finger points at cue ball from opposite side)
+          const dx = mouseX - cueBall.x;
+          const dy = mouseY - cueBall.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > 5) {
+            aimAngle = Math.atan2(dy, dx);
+          }
+          touchAimX = mouseX;
+          touchAimY = mouseY;
+          touchStarted = true;
+          // Don't start isDragging yet — let touchmove handle aim first
+          // isDragging will be set after a small drag movement in touchmove
+          isDragging = false;
+          power = 0;
+          setCurrentPower(0);
+        } else {
+          // Mouse: immediately update aim angle on click (desktop behaviour)
+          const dx = mouseX - cueBall.x;
+          const dy = mouseY - cueBall.y;
+          aimAngle = Math.atan2(dy, dx);
+          isDragging = true;
+        }
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (gameMode === 'pvc' && currentPlayerState === 2) return;
+      e.preventDefault();
+
+      if (!touchStarted || !cueBall || cueBall.pocketed || ballsMoving) return;
+
+      const pos = getPointerPos(e);
+      mouseX = pos.x;
+      mouseY = pos.y;
+
+      if (!isDragging) {
+        // Check how far finger moved from initial touch
+        const moveDx = mouseX - touchAimX;
+        const moveDy = mouseY - touchAimY;
+        const moveDist = Math.sqrt(moveDx * moveDx + moveDy * moveDy);
+
+        if (moveDist < 20) {
+          // Small movement: still in aim phase — update aim angle from current finger to cue ball direction
+          const dx = mouseX - cueBall.x;
+          const dy = mouseY - cueBall.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > 5) {
+            aimAngle = Math.atan2(dy, dx);
+          }
+        } else {
+          // Finger moved far enough: switch to drag/power phase, lock aimAngle
+          isDragging = true;
+          // Update aim angle one last time based on current position
+          const dx = mouseX - cueBall.x;
+          const dy = mouseY - cueBall.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > 5) {
+            aimAngle = Math.atan2(dy, dx);
+          }
+        }
+      } else {
+        // Power/pullback phase: compute how far behind the ball the finger is
         const dx = mouseX - cueBall.x;
         const dy = mouseY - cueBall.y;
-        aimAngle = Math.atan2(dy, dx);
-        isDragging = true;
+        const pullBack = -(dx * Math.cos(aimAngle) + dy * Math.sin(aimAngle));
+        power = Math.min(100, Math.max(0, pullBack / 1.5));
+        setCurrentPower(power);
       }
     };
 
     const handleUp = () => {
       if (gameMode === 'pvc' && currentPlayerState === 2) return;
 
-      if (isDragging && power > 5 && !ballsMoving && cueBall && !cueBall.pocketed) {
+      if (power > 5 && !ballsMoving && cueBall && !cueBall.pocketed) {
         const speed = power / 4;
         cueBall.vx = Math.cos(aimAngle) * speed;
         cueBall.vy = Math.sin(aimAngle) * speed;
         ballsMoving = true;
         shotTaken = true;
+        setTimerActive(false);
       }
       isDragging = false;
+      touchStarted = false;
       power = 0;
       setCurrentPower(0);
     };
@@ -782,11 +989,33 @@ const PoolGame = () => {
     canvas.addEventListener('mousedown', handleDown);
     canvas.addEventListener('mouseup', handleUp);
     canvas.addEventListener('touchstart', handleDown, { passive: false });
-    canvas.addEventListener('touchmove', handleMove, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', handleUp, { passive: false });
 
     initPockets();
     initBalls();
+
+    // Explicitly sync React state so Player 1 always starts first
+    currentPlayerState = 1;
+    aiThinking = false;
+    aiThinkTimer = 0;
+    aiPhase = 'aim';
+    aiPullback = 0;
+    shotTaken = false;
+    winnerState = null;
+    setTimerActive(true);
+    setTurnTimeLeft(30);
+    setGameState({
+      currentPlayer: 1,
+      player1Balls: [],
+      player2Balls: [],
+      pocketedBalls: [],
+      player1Type: null,
+      player2Type: null,
+      winner: null,
+      message: 'Player 1: Break the rack!'
+    });
+
     gameLoop();
 
     return () => {
@@ -794,31 +1023,31 @@ const PoolGame = () => {
       canvas.removeEventListener('mousedown', handleDown);
       canvas.removeEventListener('mouseup', handleUp);
       canvas.removeEventListener('touchstart', handleDown);
-      canvas.removeEventListener('touchmove', handleMove);
+      canvas.removeEventListener('touchmove', handleTouchMove);
       canvas.removeEventListener('touchend', handleUp);
     };
   }, [gameMode]);
   if (!gameMode) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden font-sans select-none">
+      <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden font-sans select-none" role="main">
 
-        {/* PREMIUM CSS BACKGROUND IMAGE EFFECT */}
-        {/* CUSTOM NEON BACKGROUND IMAGE */}
+        {/* Decorative background - hidden from screen readers */}
         <div
+          aria-hidden="true"
           className="absolute inset-0 z-0 bg-cover bg-center"
           style={{
             backgroundImage: "url('/background.png')",
             filter: 'brightness(0.4) contrast(1.1)'
           }}
         ></div>
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0f1a]/80 via-transparent to-[#0a0f1a]/90 z-0"></div>
+        <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-b from-[#0a0f1a]/80 via-transparent to-[#0a0f1a]/90 z-0"></div>
 
         <div className="relative z-10 w-full max-w-4xl text-center space-y-12">
 
           <div className="space-y-4 animate-in slide-in-from-top duration-700">
-            <div className="flex items-center justify-center gap-4 mb-2">
+            <div aria-hidden="true" className="flex items-center justify-center gap-4 mb-2">
               <div className="w-16 h-1 bg-yellow-500 rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>
-              <span className="text-yellow-500 text-3xl">🎱</span>
+              <span className="text-yellow-500 text-3xl" role="img" aria-label="billiards ball">🎱</span>
               <div className="w-16 h-1 bg-yellow-500 rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>
             </div>
             <h1 className="text-7xl font-black text-white tracking-tighter uppercase italic leading-none drop-shadow-2xl">
@@ -828,20 +1057,21 @@ const PoolGame = () => {
           </div>
 
           {/* MODE CARDS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-2xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-2xl mx-auto" role="group" aria-label="Select game mode">
 
             <button
               onClick={() => setGameMode('pvp')}
+              aria-label="Player vs Player mode - Challenge a friend on the same device"
               className="group relative bg-white/5 hover:bg-white/10 border border-white/10 rounded-[30px] p-10 transition-all duration-500 hover:scale-105 active:scale-95 shadow-2xl backdrop-blur-md overflow-hidden"
             >
-              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <div aria-hidden="true" className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <span className="text-8xl">👥</span>
               </div>
               <div className="relative z-10 text-left">
-                <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl mb-6 group-hover:bg-yellow-500 transition-colors duration-300">👥</div>
+                <div aria-hidden="true" className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl mb-6 group-hover:bg-yellow-500 transition-colors duration-300">👥</div>
                 <h3 className="text-white text-3xl font-black mb-2">PVP MODE</h3>
                 <p className="text-gray-400 font-medium">Challenge a friend on the same device.</p>
-                <div className="mt-8 flex items-center gap-2 text-yellow-500 font-bold text-sm tracking-widest opacity-0 group-hover:opacity-100 transition-all">
+                <div aria-hidden="true" className="mt-8 flex items-center gap-2 text-yellow-500 font-bold text-sm tracking-widest opacity-0 group-hover:opacity-100 transition-all">
                   START GAME <span className="group-hover:translate-x-2 transition-transform">→</span>
                 </div>
               </div>
@@ -849,16 +1079,17 @@ const PoolGame = () => {
 
             <button
               onClick={() => setGameMode('pvc')}
+              aria-label="Player vs Computer mode - Test your skills against the AI agent"
               className="group relative bg-white/5 hover:bg-white/10 border border-white/10 rounded-[30px] p-10 transition-all duration-500 hover:scale-105 active:scale-95 shadow-2xl backdrop-blur-md overflow-hidden"
             >
-              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <div aria-hidden="true" className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <span className="text-8xl">🤖</span>
               </div>
               <div className="relative z-10 text-left">
-                <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl mb-6 group-hover:bg-yellow-500 transition-colors duration-300">🤖</div>
+                <div aria-hidden="true" className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl mb-6 group-hover:bg-yellow-500 transition-colors duration-300">🤖</div>
                 <h3 className="text-white text-3xl font-black mb-2">PVC MODE</h3>
                 <p className="text-gray-400 font-medium">Test your skills against the AI agent.</p>
-                <div className="mt-8 flex items-center gap-2 text-yellow-500 font-bold text-sm tracking-widest opacity-0 group-hover:opacity-100 transition-all">
+                <div aria-hidden="true" className="mt-8 flex items-center gap-2 text-yellow-500 font-bold text-sm tracking-widest opacity-0 group-hover:opacity-100 transition-all">
                   START GAME <span className="group-hover:translate-x-2 transition-transform">→</span>
                 </div>
               </div>
@@ -867,16 +1098,16 @@ const PoolGame = () => {
           </div>
 
           {/* HELP CARD */}
-          <div className="max-w-md mx-auto bg-black/40 border border-white/5 rounded-2xl p-6 backdrop-blur-sm animate-in fade-in duration-1000 slide-in-from-bottom-5">
+          <div className="max-w-md mx-auto bg-black/40 border border-white/5 rounded-2xl p-6 backdrop-blur-sm animate-in fade-in duration-1000 slide-in-from-bottom-5" role="region" aria-label="How to play">
             <h4 className="text-gray-400 font-black text-xs uppercase tracking-widest mb-4 flex items-center justify-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500"></span> How to Play
+              <span aria-hidden="true" className="w-2 h-2 rounded-full bg-green-500"></span> How to Play
             </h4>
-            <div className="grid grid-cols-2 gap-4 text-xs font-bold uppercase tracking-tight text-white/60">
-              <div className="bg-white/5 p-2 rounded">🖱️ Move Mouse to Aim</div>
-              <div className="bg-white/5 p-2 rounded">🖱️ Drag & Pull to Power</div>
-              <div className="bg-white/5 p-2 rounded">✨ Release to Shoot</div>
-              <div className="bg-white/5 p-2 rounded">🏆 Pocket all vs 8-Ball</div>
-            </div>
+            <ul className="grid grid-cols-2 gap-4 text-xs font-bold uppercase tracking-tight text-white/60 list-none p-0 m-0">
+              <li className="bg-white/5 p-2 rounded"><span aria-hidden="true">🖱️</span> Move Mouse to Aim</li>
+              <li className="bg-white/5 p-2 rounded"><span aria-hidden="true">🖱️</span> Drag &amp; Pull to Power</li>
+              <li className="bg-white/5 p-2 rounded"><span aria-hidden="true">✨</span> Release to Shoot</li>
+              <li className="bg-white/5 p-2 rounded"><span aria-hidden="true">🏆</span> Pocket all vs 8-Ball</li>
+            </ul>
           </div>
 
         </div>
@@ -886,148 +1117,287 @@ const PoolGame = () => {
 
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-screen bg-[#070b14] p-0 font-sans select-none overflow-x-hidden text-white relative">
+    <div className="flex flex-col items-center justify-start min-h-screen bg-[#070b14] p-0 font-sans select-none overflow-x-hidden text-white relative" role="main">
 
-      {/* PROFESSIONAL BACKGROUND EFFECT */}
-      {/* CUSTOM NEON BACKGROUND IMAGE */}
+      {/* Decorative background - hidden from assistive technologies */}
       <div
+        aria-hidden="true"
         className="absolute inset-0 z-0 bg-cover bg-center opacity-60"
         style={{
           backgroundImage: "url('/background.png')",
           filter: 'brightness(0.5)'
         }}
       ></div>
-      <div className="absolute inset-0 bg-[#070b14]/40 z-0 pointer-events-none"></div>
+      <div aria-hidden="true" className="absolute inset-0 bg-[#070b14]/40 z-0 pointer-events-none"></div>
 
       {/* PROFESSIONAL TOP BAR (Menu & Status) */}
-      <div className="w-full bg-[#1e293b] border-b border-white/10 py-2 sm:py-3 px-4 sm:px-8 flex items-center justify-between shadow-lg z-30 shrink-0">
+      <nav className="w-full bg-[#1e293b] border-b border-white/10 py-1.5 xs:py-2 md:py-3 px-4 sm:px-8 hidden md:flex items-center justify-between shadow-lg z-30 shrink-0" aria-label="Game controls">
         <button
           onClick={() => setGameMode(null)}
-          className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/50 font-bold px-3 sm:px-6 py-1 rounded-lg transition-all text-xs sm:text-base"
+          aria-label="Return to main menu"
+          className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/50 font-bold px-2 sm:px-6 py-1 rounded-lg transition-all text-xs sm:text-base flex items-center justify-center"
         >
-          MENU
+          <svg aria-hidden="true" className="block md:hidden w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="4" y1="6" x2="20" y2="6" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="18" x2="20" y2="18" />
+          </svg>
+          <span className="hidden md:inline">MENU</span>
         </button>
 
-        <div className="bg-black/40 px-3 sm:px-8 py-1 rounded-full border border-yellow-500/30 mx-2">
+        <div className="bg-black/40 px-3 sm:px-8 py-1 rounded-full border border-yellow-500/30 mx-2" role="status" aria-live="polite" aria-atomic="true">
           <p className="text-yellow-400 font-black text-[10px] sm:text-sm uppercase tracking-[0.1em] sm:tracking-[0.2em] animate-pulse truncate max-w-[120px] sm:max-w-none">
             {gameState.message}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-4 text-[10px] sm:text-xs font-bold text-gray-400">
-          <span className="hidden xs:inline">POWER: {Math.floor(currentPower)}%</span>
-          <div className="w-16 sm:w-24 h-1.5 sm:h-2 bg-gray-700 rounded-full overflow-hidden">
+        <div className="flex items-center gap-2 sm:gap-4 text-[10px] sm:text-xs font-bold text-gray-400" aria-label={`Shot power: ${Math.floor(currentPower)} percent`}>
+          <span className="hidden xs:inline" aria-hidden="true">POWER: {Math.floor(currentPower)}%</span>
+          <div
+            className="w-16 sm:w-24 h-1.5 sm:h-2 bg-gray-700 rounded-full overflow-hidden"
+            role="progressbar"
+            aria-valuenow={Math.floor(currentPower)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Shot power meter"
+          >
             <div className="h-full bg-yellow-500 transition-all duration-100" style={{ width: `${currentPower}%` }}></div>
           </div>
         </div>
-      </div>
+      </nav>
 
-      <div className="flex flex-1 flex-col lg:flex-row w-full items-center lg:items-center justify-center lg:justify-between px-4 sm:px-10 py-4 lg:py-0 gap-4 lg:gap-8 relative z-20">
+      {/* MINIMAL TOP BAR - Just Player names + score + VS - Hidden on Mobile */}
+      <section className="w-full px-2 sm:px-6 lg:px-16 py-1 md:py-2 z-20 relative hidden md:block" aria-label="Score board">
+        <div className="flex items-center justify-between max-w-[1200px] mx-auto gap-2">
 
-        {/* PLAYER 1 INFO */}
-        <div className="flex flex-row lg:flex-col items-center w-full lg:w-32 space-y-0 lg:space-y-6 space-x-4 lg:space-x-0 bg-white/5 lg:bg-transparent p-3 lg:p-0 rounded-2xl lg:rounded-none">
-          <div className={`p-1 sm:p-1.5 rounded-[1rem] lg:rounded-[2rem] transition-all duration-300 ${gameState.currentPlayer === 1 ? 'bg-[#56e33e] shadow-[0_0_20px_rgba(86,227,62,0.4)] scale-105 lg:scale-110' : 'bg-gray-700/30 opacity-60'}`}>
-            <div className="w-12 h-12 sm:w-16 sm:h-16 lg:w-24 lg:h-24 bg-[#1e293b] rounded-[0.8rem] lg:rounded-[1.8rem] flex items-center justify-center text-2xl sm:text-3xl lg:text-5xl overflow-hidden border border-black/20 shadow-inner">
+          {/* P1 Name + Score */}
+          <div className="flex items-center gap-1.5" role="status" aria-label={`Player 1: ${gameState.player1Balls.length} of 7 pocketed`}>
+            <span className={`text-[10px] sm:text-xs md:text-sm font-black uppercase tracking-wider ${gameState.currentPlayer === 1 ? 'text-[#56e33e]' : 'text-gray-500'}`}>P1</span>
+            {gameState.currentPlayer === 1 && <span className="w-1.5 h-1.5 rounded-full bg-[#56e33e] animate-pulse"></span>}
+            <div className="bg-[#56e33e]/10 border border-[#56e33e]/30 rounded px-1.5 py-0.5">
+              <span className="text-[#56e33e] text-[10px] sm:text-xs font-black">{gameState.player1Balls.length}/7</span>
+            </div>
+            {gameState.player1Type && <span className="text-[8px] text-gray-500 font-bold uppercase hidden sm:inline">{gameState.player1Type === 'solid' ? 'SOLID' : 'STRIPE'}</span>}
+          </div>
+
+          {/* VS Center */}
+          <div aria-hidden="true" className="flex flex-col items-center shrink-0">
+            <span className="text-yellow-500 text-[10px] xs:text-xs md:text-sm font-black tracking-widest" style={{ textShadow: '0 0 10px rgba(234,179,8,0.5)' }}>VS</span>
+            <div className="w-8 h-0.5 bg-gradient-to-r from-[#56e33e] via-yellow-500 to-[#3b82f6] rounded-full mt-0.5"></div>
+          </div>
+
+          {/* P2 Name + Score */}
+          <div className="flex items-center gap-1.5 flex-row-reverse" role="status" aria-label={`${gameMode === 'pvc' ? 'AI' : 'Player 2'}: ${gameState.player2Balls.length} of 7 pocketed`}>
+            <span className={`text-[10px] sm:text-xs md:text-sm font-black uppercase tracking-wider ${gameState.currentPlayer === 2 ? 'text-[#3b82f6]' : 'text-gray-500'}`}>{gameMode === 'pvc' ? 'AI' : 'P2'}</span>
+            {gameState.currentPlayer === 2 && <span className="w-1.5 h-1.5 rounded-full bg-[#3b82f6] animate-pulse"></span>}
+            <div className="bg-[#3b82f6]/10 border border-[#3b82f6]/30 rounded px-1.5 py-0.5">
+              <span className="text-[#3b82f6] text-[10px] sm:text-xs font-black">{gameState.player2Balls.length}/7</span>
+            </div>
+            {gameState.player2Type && <span className="text-[8px] text-gray-500 font-bold uppercase hidden sm:inline">{gameState.player2Type === 'solid' ? 'SOLID' : 'STRIPE'}</span>}
+          </div>
+
+        </div>
+      </section>
+
+      <div className="flex flex-1 flex-row w-full items-center justify-between px-1 sm:px-4 lg:px-6 py-1 lg:py-0 gap-1 sm:gap-3 lg:gap-8 relative z-20">
+
+        {/* PLAYER 1 SIDE PANEL - Left of table, visible all screens */}
+        <div className="flex flex-col items-center shrink-0 w-[32px] xs:w-[38px] sm:w-[48px] lg:w-[80px] gap-1 lg:gap-2" role="group" aria-label={`Player 1 balls: ${gameState.player1Balls.length} of 7 pocketed`}>
+          {/* P1 Avatar */}
+          <div className={`p-0.5 lg:p-1 rounded-lg lg:rounded-2xl transition-all duration-300 shrink-0 ${gameState.currentPlayer === 1 ? 'bg-[#56e33e] shadow-[0_0_12px_rgba(86,227,62,0.5)]' : 'bg-gray-700/30 opacity-50'}`}>
+            <div className="w-5 h-5 xs:w-6 xs:h-6 sm:w-8 sm:h-8 lg:w-14 lg:h-14 bg-[#1e293b] rounded-md lg:rounded-xl flex items-center justify-center text-xs sm:text-sm lg:text-3xl border border-black/20 font-black">
               👤
             </div>
           </div>
-          <div className="flex flex-col items-start lg:items-center flex-1 lg:flex-none">
-            <p className={`font-black uppercase tracking-tight text-xs sm:text-sm lg:text-base ${gameState.currentPlayer === 1 ? 'text-[#56e33e]' : 'text-gray-500'}`}>Player 1</p>
-            <div className="flex flex-row lg:flex-col gap-1.5 sm:gap-2 mt-2">
-              {[...Array(7)].map((_, i) => {
-                const ball = gameState.player1Balls[i];
+          {/* P1 Ball Slots — vertical */}
+          <div className="flex flex-col gap-[3px] sm:gap-1 lg:gap-1.5">
+            {(() => {
+              const p1Balls = gameState.player1Type === 'stripe' ? [9, 10, 11, 12, 13, 14, 15] : [1, 2, 3, 4, 5, 6, 7];
+              return p1Balls.map((ballNum) => {
+                const isPocketed = gameState.pocketedBalls.includes(ballNum);
+                const isStripe = ballNum > 8;
                 return (
-                  <div key={i} className="w-6 h-6 sm:w-8 sm:h-8 lg:w-14 lg:h-14 rounded-full bg-[#131b2b] border lg:border-2 border-[#263347] shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] flex items-center justify-center overflow-hidden">
-                    {ball && (
-                      <div
-                        className="w-5 h-5 sm:w-7 sm:h-7 lg:w-12 lg:h-12 rounded-full flex items-center justify-center text-[8px] sm:text-[10px] lg:text-sm font-black shadow-2xl animate-in zoom-in-75 duration-500 relative"
-                        style={{
-                          backgroundColor: BALL_COLORS[ball].base,
-                          background: `radial-gradient(circle at 35% 35%, ${BALL_COLORS[ball].base}, ${BALL_COLORS[ball].shade})`
-                        }}
-                      >
-                        <div className="bg-white/90 w-3 h-3 sm:w-4 sm:h-4 lg:w-7 lg:h-7 rounded-full flex items-center justify-center text-black text-[6px] sm:text-[8px] lg:text-[10px] border border-black/10">
-                          {ball}
-                        </div>
-                      </div>
+                  <div
+                    key={ballNum}
+                    className={`w-[22px] h-[22px] xs:w-[26px] xs:h-[26px] sm:w-[32px] sm:h-[32px] lg:w-[44px] lg:h-[44px] rounded-full flex items-center justify-center text-[6px] xs:text-[7px] sm:text-[9px] lg:text-sm font-black shrink-0 transition-all duration-500 ${isPocketed ? 'shadow-lg scale-105 ring-1 ring-white/40' : 'opacity-20 scale-90 grayscale'}`}
+                    style={{
+                      background: `radial-gradient(circle at 35% 35%, ${BALL_COLORS[ballNum].base}, ${BALL_COLORS[ballNum].shade})`,
+                      boxShadow: isPocketed ? `0 0 8px ${BALL_COLORS[ballNum].base}90, inset 0 -2px 4px rgba(0,0,0,0.3)` : 'none',
+                      animation: isPocketed ? 'ballPocketGlow 1.5s ease-in-out infinite alternate' : 'none'
+                    }}
+                    aria-label={`Ball ${ballNum}${isPocketed ? ' pocketed' : ''}`}
+                  >
+                    {isStripe ? (
+                      <div className="bg-white/90 w-3 h-3 xs:w-3.5 xs:h-3.5 sm:w-4 sm:h-4 lg:w-6 lg:h-6 rounded-full flex items-center justify-center text-black text-[5px] xs:text-[6px] sm:text-[8px] lg:text-xs border border-black/10">{ballNum}</div>
+                    ) : (
+                      <span className="text-white drop-shadow-md">{ballNum}</span>
                     )}
                   </div>
                 );
-              })}
-            </div>
+              });
+            })()}
           </div>
         </div>
 
         {/* CENTER TABLE AREA */}
-        <div className="w-full max-w-[1000px] flex flex-col items-center justify-center py-2 lg:py-4">
-          <div className="relative w-full p-0.5 sm:p-1 bg-amber-950/20 rounded-[20px] sm:rounded-[40px] lg:rounded-[50px] shadow-2xl border border-white/5 backdrop-blur-sm">
+        <div className="flex-1 min-w-0 flex flex-col items-center justify-center py-1 xs:py-2 sm:py-3 md:pt-10 md:pb-4 lg:py-4 relative">
+
+          {/* NANO TIMER BOX - Fully Responsive */}
+          {timerActive && (
+            <div className={`absolute hidden md:flex md:-top-9 lg:-top-12 left- -translate-x-1/2 z-[40] min-w-[70px] md:min-w-[80px] lg:min-w-[120px] px-2 md:px-2.5 lg:px-4 py-1 md:py-1 lg:py-1.5 rounded-lg border shadow-2xl backdrop-blur-xl items-center justify-center gap-2 animate-in fade-in zoom-in duration-300 ${gameState.currentPlayer === 1
+              ? 'bg-green-500/20 border-green-500/50 text-green-400 shadow-green-500/20'
+              : 'bg-blue-500/20 border-blue-500/50 text-blue-400 shadow-blue-500/20'
+              }`}>
+              <div className="flex flex-col items-center leading-none">
+                <span className="text-[7px] xs:text-[8px] md:text-[9px] lg:text-[10px] font-black uppercase tracking-wider opacity-60">Timer</span>
+                <span className="text-[12px] xs:text-[14px] md:text-base lg:text-2xl font-black tabular-nums">
+                  {turnTimeLeft}<span className="text-[9px] xs:text-[10px] md:text-xs lg:text-lg ml-0.5 opacity-70">s</span>
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="relative w-full p-0.5 sm:p-1 bg-amber-950/20 rounded-[16px] sm:rounded-[30px] lg:rounded-[50px] shadow-2xl border border-white/5 backdrop-blur-sm">
             <canvas
               ref={canvasRef}
               width={1000}
               height={500}
-              className="w-full h-auto rounded-[18px] sm:rounded-[38px] lg:rounded-[48px] shadow-[0_20px_40px_-10px_rgba(0,0,0,1)] cursor-crosshair border-[6px] sm:border-[10px] lg:border-[12px] border-[#3E1F11] touch-none"
+              role="img"
+              aria-label={`Pool game table. ${gameState.message}. Player ${gameState.currentPlayer}'s turn.`}
+              className="w-full h-auto rounded-[10px] xs:rounded-[14px] md:rounded-[48px] shadow-[0_20px_40px_-10px_rgba(0,0,0,1)] cursor-crosshair border-[3px] xs:border-[4px] md:border-[12px] border-[#3E1F11] touch-none"
+              style={{ touchAction: 'none' }}
             />
-            <div className="absolute -bottom-8 lg:-bottom-16 left-10 lg:left-20 right-10 lg:right-20 h-10 lg:h-20 bg-black/50 blur-[40px] lg:blur-[80px] rounded-full z-[-1]"></div>
+            <div aria-hidden="true" className="absolute -bottom-6 lg:-bottom-16 left-6 lg:left-20 right-6 lg:right-20 h-8 lg:h-20 bg-black/50 blur-[30px] lg:blur-[80px] rounded-full z-[-1]"></div>
           </div>
         </div>
 
-        {/* PLAYER 2 INFO */}
-        <div className="flex flex-row-reverse lg:flex-col items-center w-full lg:w-32 space-y-0 lg:space-y-6 space-x-reverse lg:space-x-0 bg-white/5 lg:bg-transparent p-3 lg:p-0 rounded-2xl lg:rounded-none">
-          <div className={`p-1 sm:p-1.5 rounded-[1rem] lg:rounded-[2rem] transition-all duration-300 ${gameState.currentPlayer === 2 ? 'bg-[#56e33e] shadow-[0_0_20px_rgba(86,227,62,0.4)] scale-105 lg:scale-110' : 'bg-gray-700/30 opacity-60'}`}>
-            <div className="w-12 h-12 sm:w-16 sm:h-16 lg:w-24 lg:h-24 bg-[#1e293b] rounded-[0.8rem] lg:rounded-[1.8rem] flex items-center justify-center text-2xl sm:text-3xl lg:text-5xl overflow-hidden border border-black/20 shadow-inner">
+        {/* PLAYER 2 SIDE PANEL - Right of table, visible all screens */}
+        <div className="flex flex-col items-center shrink-0 w-[32px] xs:w-[38px] sm:w-[48px] lg:w-[80px] gap-1 lg:gap-2" role="group" aria-label={`${gameMode === 'pvc' ? 'AI' : 'Player 2'} balls: ${gameState.player2Balls.length} of 7 pocketed`}>
+          {/* P2 Avatar */}
+          <div className={`p-0.5 lg:p-1 rounded-lg lg:rounded-2xl transition-all duration-300 shrink-0 ${gameState.currentPlayer === 2 ? 'bg-[#3b82f6] shadow-[0_0_12px_rgba(59,130,246,0.5)]' : 'bg-gray-700/30 opacity-50'}`}>
+            <div className="w-5 h-5 xs:w-6 xs:h-6 sm:w-8 sm:h-8 lg:w-14 lg:h-14 bg-[#1e293b] rounded-md lg:rounded-xl flex items-center justify-center text-xs sm:text-sm lg:text-3xl border border-black/20 font-black">
               {gameMode === 'pvc' ? '🤖' : '👤'}
             </div>
           </div>
-          <div className="flex flex-col items-end lg:items-center flex-1 lg:flex-none">
-            <p className={`font-black uppercase tracking-tight text-xs sm:text-sm lg:text-base ${gameState.currentPlayer === 2 ? 'text-[#56e33e]' : 'text-gray-500'}`}>
-              {gameMode === 'pvc' ? 'AI Player' : 'Player 2'}
-            </p>
-            <div className="flex flex-row-reverse lg:flex-col gap-1.5 sm:gap-2 mt-2">
-              {[...Array(7)].map((_, i) => {
-                const ball = gameState.player2Balls[i];
+          {/* P2 Ball Slots — vertical */}
+          <div className="flex flex-col gap-[3px] sm:gap-1 lg:gap-1.5">
+            {(() => {
+              const p2Balls = gameState.player2Type === 'stripe' ? [9, 10, 11, 12, 13, 14, 15] : [1, 2, 3, 4, 5, 6, 7];
+              return p2Balls.map((ballNum) => {
+                const isPocketed = gameState.pocketedBalls.includes(ballNum);
+                const isStripe = ballNum > 8;
                 return (
-                  <div key={i} className="w-6 h-6 sm:w-8 sm:h-8 lg:w-14 lg:h-14 rounded-full bg-[#131b2b] border lg:border-2 border-[#263347] shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] flex items-center justify-center overflow-hidden">
-                    {ball && (
-                      <div
-                        className="w-5 h-5 sm:w-7 sm:h-7 lg:w-12 lg:h-12 rounded-full flex items-center justify-center text-[8px] sm:text-[10px] lg:text-sm font-black shadow-2xl animate-in zoom-in-75 duration-500 relative"
-                        style={{
-                          backgroundColor: BALL_COLORS[ball].base,
-                          background: `radial-gradient(circle at 35% 35%, ${BALL_COLORS[ball].base}, ${BALL_COLORS[ball].shade})`
-                        }}
-                      >
-                        <div className="bg-white/90 w-3 h-3 sm:w-4 sm:h-4 lg:w-7 lg:h-7 rounded-full flex items-center justify-center text-black text-[6px] sm:text-[8px] lg:text-[10px] border border-black/10">
-                          {ball}
-                        </div>
-                      </div>
+                  <div
+                    key={ballNum}
+                    className={`w-[22px] h-[22px] xs:w-[26px] xs:h-[26px] sm:w-[32px] sm:h-[32px] lg:w-[44px] lg:h-[44px] rounded-full flex items-center justify-center text-[6px] xs:text-[7px] sm:text-[9px] lg:text-sm font-black shrink-0 transition-all duration-500 ${isPocketed ? 'shadow-lg scale-105 ring-1 ring-white/40' : 'opacity-20 scale-90 grayscale'}`}
+                    style={{
+                      background: `radial-gradient(circle at 35% 35%, ${BALL_COLORS[ballNum].base}, ${BALL_COLORS[ballNum].shade})`,
+                      boxShadow: isPocketed ? `0 0 8px ${BALL_COLORS[ballNum].base}90, inset 0 -2px 4px rgba(0,0,0,0.3)` : 'none',
+                      animation: isPocketed ? 'ballPocketGlow 1.5s ease-in-out infinite alternate' : 'none'
+                    }}
+                    aria-label={`Ball ${ballNum}${isPocketed ? ' pocketed' : ''}`}
+                  >
+                    {isStripe ? (
+                      <div className="bg-white/90 w-3 h-3 xs:w-3.5 xs:h-3.5 sm:w-4 sm:h-4 lg:w-6 lg:h-6 rounded-full flex items-center justify-center text-black text-[5px] xs:text-[6px] sm:text-[8px] lg:text-xs border border-black/10">{ballNum}</div>
+                    ) : (
+                      <span className="text-white drop-shadow-md">{ballNum}</span>
                     )}
                   </div>
                 );
-              })}
-            </div>
+              });
+            })()}
           </div>
         </div>
       </div>
 
       {/* PREMIUM GAME OVER POPUP */}
       {gameState.winner && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-2xl flex items-center justify-center z-[200] animate-in fade-in duration-700">
-          <div className="max-w-md w-full bg-slate-900 border-[4px] border-yellow-500 rounded-[60px] p-16 text-center shadow-[0_0_150px_rgba(234,179,8,0.3)] transform animate-in zoom-in duration-500">
-            <div className="text-9xl mb-8 drop-shadow-2xl">🏆</div>
-            <h2 className="text-white text-6xl font-black mb-2 tracking-tighter italic uppercase leading-none">GAME OVER</h2>
-            <div className="h-1.5 w-32 bg-yellow-500 mx-auto my-6 rounded-full shadow-[0_0_20px_rgba(234,179,8,0.8)]"></div>
+        <div
+          className="fixed inset-0 bg-black/95 backdrop-blur-2xl flex items-center justify-center z-[200] animate-in fade-in duration-700 p-2 sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="game-over-title"
+          aria-describedby="game-over-message"
+        >
+          <div
+            className={`w-full max-w-[90%] sm:max-w-sm md:max-w-md bg-slate-900 border-2 sm:border-[3px] ${gameMode === 'pvc' && gameState.winner === 1
+              ? 'border-green-500 shadow-[0_0_100px_rgba(34,197,94,0.3)]'
+              : 'border-yellow-500 shadow-[0_0_100px_rgba(234,179,8,0.3)]'
+              } rounded-xl sm:rounded-[30px] md:rounded-[50px] text-center transform animate-in zoom-in duration-500 overflow-y-auto`}
+            style={{
+              maxHeight: '92dvh',
+              padding: isMobileLandscape ? '10px 14px' : '24px 20px',
+            }}
+          >
+            {/* Trophy emoji */}
+            <div
+              aria-hidden="true"
+              className="drop-shadow-2xl"
+              style={{
+                fontSize: isMobileLandscape ? '1.5rem' : '3rem',
+                marginBottom: isMobileLandscape ? '2px' : '12px',
+              }}
+            >
+              {gameMode === 'pvc' && gameState.winner === 1 ? '' : '🏆'}
+            </div>
 
-            <p className="text-white text-3xl font-black mb-10 tracking-tight uppercase">
-              {gameState.winner === 1 ? 'PLAYER 1' : (gameMode === 'pvc' ? 'AI PLAYER' : 'PLAYER 2')} WINS!
+            <h2
+              id="game-over-title"
+              className="text-white font-black tracking-tighter italic uppercase leading-none"
+              style={{
+                fontSize: isMobileLandscape ? '1.2rem' : '1.5rem',
+                marginBottom: isMobileLandscape ? '4px' : '6px',
+              }}
+            >
+              {gameMode === 'pvc' && gameState.winner === 1 ? 'YOU WIN!' : 'GAME OVER'}
+            </h2>
+
+            <div
+              aria-hidden="true"
+              className={`${gameMode === 'pvc' && gameState.winner === 1
+                ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.8)]'
+                : 'bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.8)]'
+                } mx-auto rounded-full`}
+              style={{
+                height: isMobileLandscape ? '2px' : '3px',
+                width: isMobileLandscape ? '40px' : '60px',
+                margin: isMobileLandscape ? '4px auto' : '10px auto 12px',
+              }}
+            />
+
+            <p
+              className="text-white font-black tracking-tight uppercase"
+              style={{
+                fontSize: isMobileLandscape ? '0.7rem' : '1rem',
+                marginBottom: isMobileLandscape ? '6px' : '14px',
+              }}
+            >
+              {gameMode === 'pvc'
+                ? (gameState.winner === 1 ? 'CONGRATULATIONS!' : 'AI PLAYER WINS!')
+                : `PLAYER ${gameState.winner} WINS!`
+              }
             </p>
 
-            <div className="bg-white/5 p-8 rounded-[40px] border border-white/10 mb-12 shadow-inner">
-              <p className="text-yellow-400 font-bold text-lg italic uppercase tracking-widest leading-relaxed">
-                " {gameState.message} "
+            <div
+              className="bg-white/5 rounded-xl border border-white/10 shadow-inner"
+              style={{
+                padding: isMobileLandscape ? '5px 10px' : '10px 14px',
+                marginBottom: isMobileLandscape ? '8px' : '16px',
+              }}
+            >
+              <p
+                id="game-over-message"
+                className={`${gameMode === 'pvc' && gameState.winner === 1 ? 'text-green-400' : 'text-yellow-400'
+                  } font-bold italic uppercase tracking-wider leading-relaxed`}
+                style={{ fontSize: isMobileLandscape ? '8px' : '11px' }}
+              >
+                &ldquo; {gameState.message} &rdquo;
               </p>
             </div>
 
-            <div className="flex flex-col gap-5">
+            <div className="flex flex-col" style={{ gap: isMobileLandscape ? '5px' : '8px' }}>
               <button
+                aria-label="Play again — start a new game"
                 onClick={() => {
                   const current = gameMode;
                   setGameMode(null);
@@ -1035,6 +1405,7 @@ const PoolGame = () => {
                     currentPlayer: 1,
                     player1Balls: [],
                     player2Balls: [],
+                    pocketedBalls: [],
                     player1Type: null,
                     player2Type: null,
                     winner: null,
@@ -1042,18 +1413,60 @@ const PoolGame = () => {
                   });
                   setTimeout(() => setGameMode(current), 50);
                 }}
-                className="bg-yellow-500 hover:bg-yellow-400 text-black text-3xl font-black py-6 rounded-full shadow-[0_8px_0_rgb(161,98,7)] transition-all hover:-translate-y-1 active:translate-y-1 active:shadow-none"
+                className="bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-full shadow-[0_4px_0_rgb(161,98,7)] transition-all hover:-translate-y-1 active:translate-y-1 active:shadow-none w-full"
+                style={{
+                  fontSize: isMobileLandscape ? '0.8rem' : '1rem',
+                  padding: isMobileLandscape ? '6px 0' : '12px 0',
+                }}
               >
                 PLAY AGAIN
               </button>
               <button
+                aria-label="Exit to main menu"
                 onClick={() => setGameMode(null)}
-                className="text-white/30 hover:text-white font-bold transition-all text-xs uppercase tracking-[0.3em] pt-4"
+                className="text-white/30 hover:text-white font-bold transition-all uppercase tracking-[0.2em] w-full"
+                style={{
+                  fontSize: '10px',
+                  paddingTop: isMobileLandscape ? '2px' : '6px',
+                }}
               >
-                Exit to
-
+                Exit to Menu
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* ROTATE DEVICE OVERLAY */}
+      {isPortrait && (
+        <div
+          className="fixed inset-0 bg-[#070b14] z-[500] flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+        >
+          <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.15),transparent_70%)]"></div>
+          <div aria-hidden="true" className="w-32 h-32 mb-10 relative z-10">
+            <div className="absolute inset-0 border-[3px] border-yellow-500/20 rounded-[2.5rem] animate-pulse"></div>
+            <div className="absolute inset-0 flex items-center justify-center text-7xl animate-[bounce_2s_infinite]">
+              📱
+            </div>
+            <div className="absolute -top-2 -right-2 w-12 h-12 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(234,179,8,0.5)] animate-[spin_3s_linear_infinite]">
+              <span className="text-black font-black text-xl">↻</span>
+            </div>
+          </div>
+
+          <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 mb-4 tracking-tighter uppercase italic z-10 drop-shadow-sm">
+            Flip to Play
+          </h2>
+
+          <div aria-hidden="true" className="h-1 w-16 bg-gradient-to-r from-transparent via-yellow-500 to-transparent mb-6 rounded-full opacity-50 z-10"></div>
+
+          <p className="text-blue-100/60 font-bold max-w-[240px] leading-relaxed z-10 uppercase tracking-widest text-[10px] sm:text-xs">
+            Game optimized for <span className="text-yellow-500">Landscape Mode</span>. Please rotate your device.
+          </p>
+
+          <div aria-hidden="true" className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce opacity-20 z-10">
+            <div className="w-1 h-12 bg-gradient-to-b from-yellow-500 to-transparent rounded-full"></div>
           </div>
         </div>
       )}
