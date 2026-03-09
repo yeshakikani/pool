@@ -1069,7 +1069,7 @@ const PoolGame = () => {
               </div>
               <div className="relative z-10 text-left">
                 <div aria-hidden="true" className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl mb-6 group-hover:bg-yellow-500 transition-colors duration-300">👥</div>
-                <h3 className="text-white text-3xl font-black mb-2">PVP MODE</h3>
+                <h2 className="text-white text-3xl font-black mb-2">PVP MODE</h2>
                 <p className="text-gray-400 font-medium">Challenge a friend on the same device.</p>
                 <div aria-hidden="true" className="mt-8 flex items-center gap-2 text-yellow-500 font-bold text-sm tracking-widest opacity-0 group-hover:opacity-100 transition-all">
                   START GAME <span className="group-hover:translate-x-2 transition-transform">→</span>
@@ -1087,7 +1087,7 @@ const PoolGame = () => {
               </div>
               <div className="relative z-10 text-left">
                 <div aria-hidden="true" className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl mb-6 group-hover:bg-yellow-500 transition-colors duration-300">🤖</div>
-                <h3 className="text-white text-3xl font-black mb-2">PVC MODE</h3>
+                <h2 className="text-white text-3xl font-black mb-2">PVC MODE</h2>
                 <p className="text-gray-400 font-medium">Test your skills against the AI agent.</p>
                 <div aria-hidden="true" className="mt-8 flex items-center gap-2 text-yellow-500 font-bold text-sm tracking-widest opacity-0 group-hover:opacity-100 transition-all">
                   START GAME <span className="group-hover:translate-x-2 transition-transform">→</span>
@@ -1099,9 +1099,9 @@ const PoolGame = () => {
 
           {/* HELP CARD */}
           <div className="max-w-md mx-auto bg-black/40 border border-white/5 rounded-2xl p-6 backdrop-blur-sm animate-in fade-in duration-1000 slide-in-from-bottom-5" role="region" aria-label="How to play">
-            <h4 className="text-gray-400 font-black text-xs uppercase tracking-widest mb-4 flex items-center justify-center gap-2">
+            <h2 className="text-gray-400 font-black text-xs uppercase tracking-widest mb-4 flex items-center justify-center gap-2">
               <span aria-hidden="true" className="w-2 h-2 rounded-full bg-green-500"></span> How to Play
-            </h4>
+            </h2>
             <ul className="grid grid-cols-2 gap-4 text-xs font-bold uppercase tracking-tight text-white/60 list-none p-0 m-0">
               <li className="bg-white/5 p-2 rounded"><span aria-hidden="true">🖱️</span> Move Mouse to Aim</li>
               <li className="bg-white/5 p-2 rounded"><span aria-hidden="true">🖱️</span> Drag &amp; Pull to Power</li>
@@ -1118,6 +1118,7 @@ const PoolGame = () => {
 
   return (
     <div className="flex flex-col items-center justify-start min-h-screen bg-[#070b14] p-0 font-sans select-none overflow-x-hidden text-white relative" role="main">
+      <h1 className="sr-only">Pool Pro Game Table</h1>
 
       {/* Decorative background - hidden from assistive technologies */}
       <div
