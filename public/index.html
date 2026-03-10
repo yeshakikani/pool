@@ -12,14 +12,21 @@
   <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
   <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
 
-  <!-- Preload critical background image for faster LCP -->
+  <!-- Performance: Resource Discovery -->
+  <link rel="preconnect" href="https://pool-eight-umber.vercel.app" crossorigin />
+  <link rel="dns-prefetch" href="https://pool-eight-umber.vercel.app" />
+
+  <!-- Performance: Critical Asset Preloading -->
   <link rel="preload" href="/background.png" as="image" fetchpriority="high" />
 
-  <!-- Preconnect for any external resources -->
+  <!-- Security & UX -->
   <meta name="color-scheme" content="dark" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
 
   <title>Pool Pro Championship - Play 8-Ball Pool Online</title>
 </head>
+
 
 <body>
   <noscript>You need to enable JavaScript to run this app.</noscript>
