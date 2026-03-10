@@ -89,7 +89,7 @@ const PoolGame = () => {
     const TABLE_WIDTH = 1000;
     const TABLE_HEIGHT = 500;
     const BALL_RADIUS = 14;
-    const POCKET_RADIUS = 35;
+    const POCKET_RADIUS = 26; // Smaller pockets as requested
     const FRICTION = 0.988;
     const CUSHION_BOUNCE = 0.70;
 
@@ -104,6 +104,7 @@ const PoolGame = () => {
     let isDragging = false;
     let mouseX = 0;
     let mouseY = 0;
+    let dragStartPullBack = 0;
     let currentPlayerState = 1;
     let player1BallsState = [];
     let player2BallsState = [];
@@ -121,9 +122,9 @@ const PoolGame = () => {
     let winnerState = null;
 
     const initPockets = () => {
-      const cornerOffset = 35;
+      const cornerOffset = 42; // Moved slightly inwards for full round look
       const sideOffsetX = TABLE_WIDTH / 2;
-      const sideOffsetY = 25;
+      const sideOffsetY = 38; // Adjusted to align with rails
 
       pockets = [
         { x: cornerOffset, y: cornerOffset },
@@ -869,9 +870,8 @@ const PoolGame = () => {
             // Drag/power phase: finger moved far enough from initial touch — compute pullback
             const dx = mouseX - cueBall.x;
             const dy = mouseY - cueBall.y;
-            // Dot product with OPPOSITE of aimAngle → how far behind the ball the finger is
             const pullBack = -(dx * Math.cos(aimAngle) + dy * Math.sin(aimAngle));
-            power = Math.min(100, Math.max(0, pullBack / 1.5));
+            power = Math.min(100, Math.max(0, (pullBack - dragStartPullBack) / 1.5));
             setCurrentPower(power);
           }
         } else {
@@ -885,7 +885,7 @@ const PoolGame = () => {
             const dx = mouseX - cueBall.x;
             const dy = mouseY - cueBall.y;
             const pullBack = -(dx * Math.cos(aimAngle) + dy * Math.sin(aimAngle));
-            power = Math.min(100, Math.max(0, pullBack / 1.5));
+            power = Math.min(100, Math.max(0, (pullBack - dragStartPullBack) / 1.5));
             setCurrentPower(power);
           }
         }
@@ -922,6 +922,7 @@ const PoolGame = () => {
           const dx = mouseX - cueBall.x;
           const dy = mouseY - cueBall.y;
           aimAngle = Math.atan2(dy, dx);
+          dragStartPullBack = -(dx * Math.cos(aimAngle) + dy * Math.sin(aimAngle));
           isDragging = true;
         }
       }
@@ -960,6 +961,7 @@ const PoolGame = () => {
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist > 5) {
             aimAngle = Math.atan2(dy, dx);
+            dragStartPullBack = -(dx * Math.cos(aimAngle) + dy * Math.sin(aimAngle));
           }
         }
       } else {
@@ -967,7 +969,7 @@ const PoolGame = () => {
         const dx = mouseX - cueBall.x;
         const dy = mouseY - cueBall.y;
         const pullBack = -(dx * Math.cos(aimAngle) + dy * Math.sin(aimAngle));
-        power = Math.min(100, Math.max(0, pullBack / 1.5));
+        power = Math.min(100, Math.max(0, (pullBack - dragStartPullBack) / 1.5));
         setCurrentPower(power);
       }
     };
