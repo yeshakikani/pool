@@ -119,6 +119,7 @@ const PoolGame = () => {
     let aiThinkTimer = 0;
     let aiPhase = 'aim'; // 'aim' | 'pullback' | 'fire'
     let aiPullback = 0;   // 0-100, current pullback amount
+    let aiTargetPower = 40; // the requested power calculated via aiComputeAngle()
     let winnerState = null;
 
     const initPockets = () => {
@@ -402,10 +403,7 @@ const PoolGame = () => {
     const aiComputeAngle = () => {
       if (!cueBall || cueBall.pocketed) return 0;
 
-      let bestAngle = 0;
-      let bestScore = -1;
       const myType = player2TypeState;
-
       const targetBalls = balls.filter(b => {
         if (b.pocketed || b.number === 0) return false;
         if (!myType) return b.number !== 8;
@@ -418,45 +416,112 @@ const PoolGame = () => {
         if (eightBall) targetBalls.push(eightBall);
       }
 
-      const currentCueBall = cueBall;
-      const currentPockets = pockets;
-      for (let i = 0; i < 36; i++) {
-        const angle = (i / 36) * Math.PI * 2;
-        let score = 0;
+      let bestShot = null;
+      let minDifficulty = Infinity;
 
-        targetBalls.forEach(ball => {
-          const dx = ball.x - currentCueBall.x;
-          const dy = ball.y - currentCueBall.y;
-          const angleToBall = Math.atan2(dy, dx);
-          const angleDiff = Math.abs(angleToBall - angle);
+      // Helper to check if a straight line path is clear of other balls
+      const isPathClear = (startX, startY, endX, endY, ignoreBall1, ignoreBall2) => {
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const ux = dx / dist;
+        const uy = dy / dist;
 
-          if (angleDiff < 0.3) {
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            score += 100 / (dist + 1);
-
-            currentPockets.forEach(pocket => {
-              const pdx = ball.x - pocket.x;
-              const pdy = ball.y - pocket.y;
-              const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
-              score += 50 / (pdist + 1);
-            });
+        for (const ball of balls) {
+          if (ball.pocketed || ball === ignoreBall1 || ball === ignoreBall2) continue;
+          
+          const bx = ball.x - startX;
+          const by = ball.y - startY;
+          const proj = bx * ux + by * uy;
+          
+          if (proj > 0 && proj < dist) {
+            const perpDist = Math.abs(bx * uy - by * ux);
+            // Clearance slightly larger than ball diameter
+            if (perpDist < BALL_RADIUS * 2.2) return false; // Blocked
           }
-        });
+        }
+        return true;
+      };
 
-        if (score > bestScore) {
-          bestScore = score;
-          bestAngle = angle;
+      // Raycast each valid target ball
+      for (const target of targetBalls) {
+        for (const pocket of pockets) {
+          // Check target to pocket path
+          if (!isPathClear(target.x, target.y, pocket.x, pocket.y, target, null)) continue;
+
+          // Compute ghost ball position
+          const dx = pocket.x - target.x;
+          const dy = pocket.y - target.y;
+          const distToPocket = Math.sqrt(dx * dx + dy * dy);
+          const ux = dx / distToPocket;
+          const uy = dy / distToPocket;
+          
+          const ghostX = target.x - ux * (BALL_RADIUS * 2);
+          const ghostY = target.y - uy * (BALL_RADIUS * 2);
+
+          // Check if ghost ball is within the valid table boundary (avoid cushion overlap)
+          const margin = 35;
+          if (ghostX < margin || ghostX > TABLE_WIDTH - margin || ghostY < margin || ghostY > TABLE_HEIGHT - margin) {
+            continue; // Ghost ball is off the table cushions
+          }
+
+          // Check cue to ghost path
+          if (!isPathClear(cueBall.x, cueBall.y, ghostX, ghostY, cueBall, target)) continue;
+
+          const cueDx = ghostX - cueBall.x;
+          const cueDy = ghostY - cueBall.y;
+          const distToGhost = Math.sqrt(cueDx * cueDx + cueDy * cueDy);
+          const cueUx = cueDx / distToGhost;
+          const cueUy = cueDy / distToGhost;
+
+          const dot = cueUx * ux + cueUy * uy; // 1 = straight, 0 = 90 deg cut
+          if (dot <= 0.1) continue; // Unrealistic cut
+
+          const cutAngle = Math.acos(dot) * (180 / Math.PI);
+          const difficulty = (distToPocket * 1.5) + distToGhost + (cutAngle * 8);
+
+          if (difficulty < minDifficulty) {
+            minDifficulty = difficulty;
+            
+            // Add a very slight human-like margin of error mapped to difficulty
+            const error = (Math.random() - 0.5) * (difficulty / 3000);
+            
+            bestShot = {
+              angle: Math.atan2(cueDy, cueDx) + error,
+              power: Math.min(100, Math.max(30, (distToPocket + distToGhost) / 5))
+            };
+          }
         }
       }
-      return bestAngle;
+
+      if (bestShot) {
+        aiTargetPower = bestShot.power;
+        return bestShot.angle; // Human-like calculated aiming angle
+      }
+
+      // Fallback 1: If no clear pocket, find a legal target ball we can safely nudge
+      for (const target of targetBalls) {
+         if (isPathClear(cueBall.x, cueBall.y, target.x, target.y, cueBall, target)) {
+             aiTargetPower = 35 + Math.random() * 20;
+             return Math.atan2(target.y - cueBall.y, target.x - cueBall.x);
+         }
+      }
+
+      // Fallback 2: Desperate shot — shoot somewhere towards a target ball
+      const fallbackTarget = targetBalls[Math.floor(Math.random() * targetBalls.length)];
+      if (fallbackTarget) {
+         aiTargetPower = 40 + Math.random() * 30;
+         return Math.atan2(fallbackTarget.y - cueBall.y, fallbackTarget.x - cueBall.x);
+      }
+      
+      aiTargetPower = 40;
+      return 0;
     };
 
     const aiTakeShot = () => {
       if (!cueBall || cueBall.pocketed) return;
 
-      const aiPower = 40 + Math.random() * 30;
-      const speed = aiPower / 4;
-
+      const speed = aiTargetPower / 4;
       cueBall.vx = Math.cos(aimAngle) * speed;
       cueBall.vy = Math.sin(aimAngle) * speed;
       ballsMoving = true;
@@ -803,9 +868,9 @@ const PoolGame = () => {
             aiPhase = 'pullback';
           }
         } else if (aiPhase === 'pullback') {
-          // Phase 2 (40-100 frames): animate cue pulling back
-          aiPullback = Math.min(100, aiPullback + 2.5);
-          if (aiPullback >= 100) {
+          // Phase 2: animate cue pulling back to designated power state
+          aiPullback = Math.min(Math.max(20, aiTargetPower), aiPullback + 2.5);
+          if (aiPullback >= Math.max(20, aiTargetPower)) {
             aiPhase = 'fire';
           }
         } else if (aiPhase === 'fire') {
@@ -1130,7 +1195,7 @@ const PoolGame = () => {
 
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-screen bg-[#070b14] p-0 font-sans select-none overflow-x-hidden text-white relative" role="main">
+    <div className="flex flex-col items-center justify-start h-screen h-[100dvh] overflow-hidden bg-[#070b14] p-0 font-sans select-none text-white relative" role="main">
 
       {/* Decorative background - hidden from assistive technologies */}
       <div
