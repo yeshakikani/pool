@@ -1037,7 +1037,7 @@ const PoolGame = () => {
   }, [gameMode]);
   if (!gameMode) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden font-sans select-none" role="main">
+      <div className="h-[100dvh] w-full flex items-center justify-center p-2 sm:p-4 fixed inset-0 overflow-hidden font-sans select-none bg-[#070b14]" role="main">
 
         {/* Premium Performance Background: Radial Gradient replaces heavy image for 100% score */}
         <div
@@ -1052,75 +1052,77 @@ const PoolGame = () => {
         </div>
         <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-b from-[#0a0f1a]/80 via-transparent to-[#0a0f1a]/90 z-0"></div>
 
+        <div className="relative z-10 w-full max-w-5xl flex flex-col items-center justify-center h-full max-h-[900px]">
 
-        <div className="relative z-10 w-full max-w-4xl text-center space-y-12">
+          <div className="flex flex-col items-center justify-center w-full gap-4 sm:gap-6 lg:gap-10 translate-y-[-2%]">
 
-          <div className="space-y-4 animate-in slide-in-from-top duration-700">
-            <div aria-hidden="true" className="flex items-center justify-center gap-4 mb-2">
-              <div className="w-16 h-1 bg-yellow-500 rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>
-              <span className="text-yellow-500 text-3xl" role="img" aria-label="billiards ball">🎱</span>
-              <div className="w-16 h-1 bg-yellow-500 rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>
+            <div className="space-y-2 lg:space-y-4 animate-in slide-in-from-top duration-700">
+              <div aria-hidden="true" className="flex items-center justify-center gap-2 lg:gap-4 mb-1 lg:mb-2">
+                <div className="w-10 lg:w-16 h-1 bg-yellow-500 rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>
+                <span className="text-yellow-500 text-2xl lg:text-3xl" role="img" aria-label="billiards ball">🎱</span>
+                <div className="w-10 lg:w-16 h-1 bg-yellow-500 rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>
+              </div>
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-white tracking-tighter uppercase italic leading-none drop-shadow-2xl text-center">
+                POOL <span className="text-yellow-500">PRO</span>
+              </h1>
+              <p className="text-gray-400 text-xs md:text-base lg:text-lg font-bold tracking-[0.2em] lg:tracking-[0.3em] uppercase opacity-70 text-center">Championship Series</p>
             </div>
-            <h1 className="text-7xl font-black text-white tracking-tighter uppercase italic leading-none drop-shadow-2xl">
-              POOL <span className="text-yellow-500">PRO</span>
-            </h1>
-            <p className="text-gray-400 text-lg font-bold tracking-[0.3em] uppercase opacity-70">Championship Series</p>
-          </div>
 
-          {/* MODE CARDS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-2xl mx-auto" role="group" aria-label="Select game mode">
+            {/* MODE CARDS */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 w-full max-w-sm md:max-w-2xl lg:max-w-3xl mx-auto px-4" role="group" aria-label="Select game mode">
 
-            <button
-              onClick={() => setGameMode('pvp')}
-              aria-label="Player vs Player mode - Challenge a friend on the same device"
-              className="group relative bg-white/5 hover:bg-white/10 border border-white/10 rounded-[30px] p-10 transition-all duration-500 hover:scale-105 active:scale-95 shadow-2xl backdrop-blur-md overflow-hidden"
-            >
-              <div aria-hidden="true" className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                <span className="text-8xl">👥</span>
-              </div>
-              <div className="relative z-10 text-left">
-                <div aria-hidden="true" className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl mb-6 group-hover:bg-yellow-500 transition-colors duration-300">👥</div>
-                <h2 className="text-white text-3xl font-black mb-2">PVP MODE</h2>
-                <p className="text-gray-400 font-medium">Challenge a friend on the same device.</p>
-                <div aria-hidden="true" className="mt-8 flex items-center gap-2 text-yellow-500 font-bold text-sm tracking-widest opacity-0 group-hover:opacity-100 transition-all">
-                  START GAME <span className="group-hover:translate-x-2 transition-transform">→</span>
+              <button
+                onClick={() => setGameMode('pvp')}
+                aria-label="Player vs Player mode - Challenge a friend on the same device"
+                className="group relative bg-white/5 hover:bg-white/10 border border-white/10 rounded-[24px] lg:rounded-[30px] p-5 lg:p-8 transition-all duration-500 hover:scale-105 active:scale-95 shadow-2xl backdrop-blur-md overflow-hidden text-center md:text-left"
+              >
+                <div aria-hidden="true" className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <span className="text-6xl lg:text-8xl">👥</span>
                 </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setGameMode('pvc')}
-              aria-label="Player vs Computer mode - Test your skills against the AI agent"
-              className="group relative bg-white/5 hover:bg-white/10 border border-white/10 rounded-[30px] p-10 transition-all duration-500 hover:scale-105 active:scale-95 shadow-2xl backdrop-blur-md overflow-hidden"
-            >
-              <div aria-hidden="true" className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                <span className="text-8xl">🤖</span>
-              </div>
-              <div className="relative z-10 text-left">
-                <div aria-hidden="true" className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl mb-6 group-hover:bg-yellow-500 transition-colors duration-300">🤖</div>
-                <h2 className="text-white text-3xl font-black mb-2">PVC MODE</h2>
-                <p className="text-gray-400 font-medium">Test your skills against the AI agent.</p>
-                <div aria-hidden="true" className="mt-8 flex items-center gap-2 text-yellow-500 font-bold text-sm tracking-widest opacity-0 group-hover:opacity-100 transition-all">
-                  START GAME <span className="group-hover:translate-x-2 transition-transform">→</span>
+                <div className="relative z-10 flex flex-col items-center md:items-start">
+                  <div aria-hidden="true" className="w-10 h-10 lg:w-12 lg:h-12 bg-white/10 rounded-xl flex items-center justify-center text-xl lg:text-2xl mb-3 lg:mb-6 group-hover:bg-yellow-500 transition-colors duration-300">👥</div>
+                  <h2 className="text-white text-2xl lg:text-3xl font-black mb-1 lg:mb-2">PVP MODE</h2>
+                  <p className="text-gray-400 font-medium text-xs lg:text-sm">Challenge a friend on the same device.</p>
+                  <div aria-hidden="true" className="mt-4 lg:mt-8 flex items-center justify-center md:justify-start gap-2 text-yellow-500 font-bold text-xs tracking-widest opacity-0 group-hover:opacity-100 transition-all">
+                    START GAME <span className="group-hover:translate-x-2 transition-transform">→</span>
+                  </div>
                 </div>
-              </div>
-            </button>
+              </button>
+
+              <button
+                onClick={() => setGameMode('pvc')}
+                aria-label="Player vs Computer mode - Test your skills against the AI agent"
+                className="group relative bg-white/5 hover:bg-white/10 border border-white/10 rounded-[24px] lg:rounded-[30px] p-5 lg:p-8 transition-all duration-500 hover:scale-105 active:scale-95 shadow-2xl backdrop-blur-md overflow-hidden text-center md:text-left"
+              >
+                <div aria-hidden="true" className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <span className="text-6xl lg:text-8xl">🤖</span>
+                </div>
+                <div className="relative z-10 flex flex-col items-center md:items-start">
+                  <div aria-hidden="true" className="w-10 h-10 lg:w-12 lg:h-12 bg-white/10 rounded-xl flex items-center justify-center text-xl lg:text-2xl mb-3 lg:mb-6 group-hover:bg-yellow-500 transition-colors duration-300">🤖</div>
+                  <h2 className="text-white text-2xl lg:text-3xl font-black mb-1 lg:mb-2">PVC MODE</h2>
+                  <p className="text-gray-400 font-medium text-xs lg:text-sm">Test your skills against the AI agent.</p>
+                  <div aria-hidden="true" className="mt-4 lg:mt-8 flex items-center justify-center md:justify-start gap-2 text-yellow-500 font-bold text-xs tracking-widest opacity-0 group-hover:opacity-100 transition-all">
+                    START GAME <span className="group-hover:translate-x-2 transition-transform">→</span>
+                  </div>
+                </div>
+              </button>
+
+            </div>
+
+            {/* HELP CARD */}
+            <div className="max-w-md w-full mx-auto bg-black/40 border border-white/5 rounded-xl lg:rounded-2xl p-4 lg:p-6 backdrop-blur-sm animate-in fade-in duration-1000 slide-in-from-bottom-5 px-4" role="region" aria-label="How to play">
+              <h2 className="text-gray-400 font-black text-[10px] lg:text-xs uppercase tracking-widest mb-3 lg:mb-4 flex items-center justify-center gap-2">
+                <span aria-hidden="true" className="w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-green-500"></span> How to Play
+              </h2>
+              <ul className="grid grid-cols-2 gap-2 lg:gap-4 text-[9px] lg:text-xs font-bold uppercase tracking-tight text-white/60 list-none p-0 m-0">
+                <li className="bg-white/5 p-2 rounded flex items-center gap-1.5"><span aria-hidden="true">🖱️</span> Move Mouse to Aim</li>
+                <li className="bg-white/5 p-2 rounded flex items-center gap-1.5"><span aria-hidden="true">🖱️</span> Drag Pull Power</li>
+                <li className="bg-white/5 p-2 rounded flex items-center gap-1.5"><span aria-hidden="true">✨</span> Release to Shoot</li>
+                <li className="bg-white/5 p-2 rounded flex items-center gap-1.5"><span aria-hidden="true">🏆</span> Pocket vs 8-Ball</li>
+              </ul>
+            </div>
 
           </div>
-
-          {/* HELP CARD */}
-          <div className="max-w-md mx-auto bg-black/40 border border-white/5 rounded-2xl p-6 backdrop-blur-sm animate-in fade-in duration-1000 slide-in-from-bottom-5" role="region" aria-label="How to play">
-            <h2 className="text-gray-400 font-black text-xs uppercase tracking-widest mb-4 flex items-center justify-center gap-2">
-              <span aria-hidden="true" className="w-2 h-2 rounded-full bg-green-500"></span> How to Play
-            </h2>
-            <ul className="grid grid-cols-2 gap-4 text-xs font-bold uppercase tracking-tight text-white/60 list-none p-0 m-0">
-              <li className="bg-white/5 p-2 rounded"><span aria-hidden="true">🖱️</span> Move Mouse to Aim</li>
-              <li className="bg-white/5 p-2 rounded"><span aria-hidden="true">🖱️</span> Drag &amp; Pull to Power</li>
-              <li className="bg-white/5 p-2 rounded"><span aria-hidden="true">✨</span> Release to Shoot</li>
-              <li className="bg-white/5 p-2 rounded"><span aria-hidden="true">🏆</span> Pocket all vs 8-Ball</li>
-            </ul>
-          </div>
-
         </div>
       </div>
     );
@@ -1331,82 +1333,62 @@ const PoolGame = () => {
           aria-describedby="game-over-message"
         >
           <div
-            className={`w-full max-w-[90%] sm:max-w-sm md:max-w-md bg-slate-900 border-2 sm:border-[3px] ${gameMode === 'pvc' && gameState.winner === 1
-              ? 'border-green-500 shadow-[0_0_100px_rgba(34,197,94,0.3)]'
-              : 'border-yellow-500 shadow-[0_0_100px_rgba(234,179,8,0.3)]'
-              } rounded-xl sm:rounded-[30px] md:rounded-[50px] text-center transform animate-in zoom-in duration-500 overflow-y-auto`}
+            className={`w-full max-w-[90%] sm:max-w-sm md:max-w-md bg-[#0a0f1a]/95 backdrop-blur-2xl border-2 sm:border-[4px] ${gameMode === 'pvc' && gameState.winner === 1
+              ? 'border-green-400 shadow-[0_0_120px_rgba(74,222,128,0.4)]'
+              : 'border-yellow-400 shadow-[0_0_120px_rgba(250,204,21,0.4)]'
+              } rounded-[40px] text-center transform animate-in zoom-in duration-500 overflow-y-auto relative`}
             style={{
               maxHeight: '92dvh',
-              padding: isMobileLandscape ? '10px 14px' : '24px 20px',
+              padding: isMobileLandscape ? '16px 20px' : '40px 30px',
             }}
           >
-            {/* Trophy emoji */}
+            {/* Background Glow Effect */}
+            <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 blur-[60px] opacity-20 -z-10 ${gameMode === 'pvc' && gameState.winner === 1 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+
+            {/* Trophy emoji / Icon */}
             <div
               aria-hidden="true"
-              className="drop-shadow-2xl"
-              style={{
-                fontSize: isMobileLandscape ? '1.5rem' : '3rem',
-                marginBottom: isMobileLandscape ? '2px' : '12px',
-              }}
+              className="relative inline-block mb-4 sm:mb-8"
             >
-              {gameMode === 'pvc' && gameState.winner === 1 ? '' : '🏆'}
+              <div className={`absolute inset-0 blur-3xl opacity-50 ${gameMode === 'pvc' && gameState.winner === 1 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+              <div
+                className="relative text-7xl sm:text-8xl drop-shadow-[0_0_15px_rgba(0,0,0,0.5)] animate-[bounce_3s_infinite]"
+                style={{
+                  fontSize: isMobileLandscape ? '2.5rem' : '5rem',
+                }}
+              >
+                {gameMode === 'pvc' && gameState.winner === 1 ? '🏆' : (gameState.winner === 2 && gameMode === 'pvc' ? '🤖' : '🏆')}
+              </div>
             </div>
 
             <h2
               id="game-over-title"
-              className="text-white font-black tracking-tighter italic uppercase leading-none"
+              className="text-white font-black tracking-tighter italic uppercase leading-tight mb-1"
               style={{
-                fontSize: isMobileLandscape ? '1.2rem' : '1.5rem',
-                marginBottom: isMobileLandscape ? '4px' : '6px',
+                fontSize: isMobileLandscape ? '1.8rem' : '2.8rem',
               }}
             >
-              {gameMode === 'pvc' && gameState.winner === 1 ? 'YOU WIN!' : 'GAME OVER'}
+              {gameMode === 'pvc'
+                ? (gameState.winner === 1 ? 'YOU WIN!' : 'AI WINS!')
+                : `PLAYER ${gameState.winner} WINS!`}
             </h2>
 
             <div
               aria-hidden="true"
               className={`${gameMode === 'pvc' && gameState.winner === 1
-                ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.8)]'
-                : 'bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.8)]'
-                } mx-auto rounded-full`}
+                ? 'bg-green-500'
+                : 'bg-yellow-500'
+                } mx-auto rounded-full mt-2`}
               style={{
-                height: isMobileLandscape ? '2px' : '3px',
-                width: isMobileLandscape ? '40px' : '60px',
-                margin: isMobileLandscape ? '4px auto' : '10px auto 12px',
+                height: '4px',
+                width: '80px',
+                margin: isMobileLandscape ? '8px auto' : '15px auto 20px',
               }}
             />
 
-            <p
-              className="text-white font-black tracking-tight uppercase"
-              style={{
-                fontSize: isMobileLandscape ? '0.7rem' : '1rem',
-                marginBottom: isMobileLandscape ? '6px' : '14px',
-              }}
-            >
-              {gameMode === 'pvc'
-                ? (gameState.winner === 1 ? 'CONGRATULATIONS!' : 'AI PLAYER WINS!')
-                : `PLAYER ${gameState.winner} WINS!`
-              }
-            </p>
 
-            <div
-              className="bg-white/5 rounded-xl border border-white/10 shadow-inner"
-              style={{
-                padding: isMobileLandscape ? '5px 10px' : '10px 14px',
-                marginBottom: isMobileLandscape ? '8px' : '16px',
-              }}
-            >
-              <p
-                id="game-over-message"
-                className={`${gameMode === 'pvc' && gameState.winner === 1 ? 'text-green-400' : 'text-yellow-400'
-                  } font-bold italic uppercase tracking-wider leading-relaxed`}
-                style={{ fontSize: isMobileLandscape ? '8px' : '11px' }}
-              >
-                &ldquo; {gameState.message} &rdquo;
-              </p>
-            </div>
 
-            <div className="flex flex-col" style={{ gap: isMobileLandscape ? '5px' : '8px' }}>
+            <div className="flex flex-col gap-3 sm:gap-4">
               <button
                 aria-label="Play again — start a new game"
                 onClick={() => {
@@ -1424,29 +1406,25 @@ const PoolGame = () => {
                   });
                   setTimeout(() => setGameMode(current), 50);
                 }}
-                className="bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-full shadow-[0_4px_0_rgb(161,98,7)] transition-all hover:-translate-y-1 active:translate-y-1 active:shadow-none w-full"
-                style={{
-                  fontSize: isMobileLandscape ? '0.8rem' : '1rem',
-                  padding: isMobileLandscape ? '6px 0' : '12px 0',
-                }}
+                className="group relative bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-2xl py-4 sm:py-5 transition-all duration-300 overflow-hidden shadow-[0_10px_20px_rgba(234,179,8,0.2)]"
               >
-                PLAY AGAIN
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/40 to-white/0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
+                <span className="relative z-10 text-lg uppercase tracking-wider">Play Another Match</span>
               </button>
+
               <button
                 aria-label="Exit to main menu"
                 onClick={() => setGameMode(null)}
-                className="text-white/30 hover:text-white font-bold transition-all uppercase tracking-[0.2em] w-full"
-                style={{
-                  fontSize: '10px',
-                  paddingTop: isMobileLandscape ? '2px' : '6px',
-                }}
+                className="text-white/40 hover:text-white font-bold transition-all uppercase tracking-[0.3em] py-2"
+                style={{ fontSize: '10px' }}
               >
-                Exit to Menu
+                Back to Menu
               </button>
             </div>
           </div>
         </div>
       )}
+
       {/* ROTATE DEVICE OVERLAY */}
       {isPortrait && (
         <div
@@ -1482,6 +1460,7 @@ const PoolGame = () => {
         </div>
       )}
     </div>
+
   );
 };
 
