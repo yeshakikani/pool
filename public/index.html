@@ -16,22 +16,67 @@
   <link rel="preconnect" href="https://pool-eight-umber.vercel.app" crossorigin />
   <link rel="dns-prefetch" href="https://pool-eight-umber.vercel.app" />
 
-  <!-- Performance: Deferred Asset Loading -->
-  <link rel="prefetch" href="/background.png" as="image" />
-
   <!-- Security & UX -->
   <meta name="color-scheme" content="dark" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
 
   <title>Pool Pro Championship - Play 8-Ball Pool Online</title>
-  <link rel="icon" type="image/png" href="%PUBLIC_URL%/favicon.png">
+
+  <!-- CRITICAL CSS: Painted instantly before JS bundle loads — eliminates blank screen that hurts LCP -->
+  <style>
+    *,*::before,*::after{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:#070b14;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto',sans-serif;-webkit-font-smoothing:antialiased;overscroll-behavior:none;overflow:hidden;width:100%;height:100%}
+    #root{width:100%;height:100%}
+    #lcp-shell{position:fixed;inset:0;background:#070b14;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:1;pointer-events:none}
+    #lcp-shell .bars{display:flex;align-items:center;gap:12px}
+    #lcp-shell .bar{width:48px;height:4px;background:#eab308;border-radius:9999px;box-shadow:0 0 10px rgba(234,179,8,.5)}
+    #lcp-shell .icon{font-size:1.6rem}
+    #lcp-shell h1{margin:0;font-size:clamp(2.5rem,8vw,5rem);font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-0.04em;line-height:1;color:#fff}
+    #lcp-shell h1 span{color:#eab308}
+    #lcp-shell .sub{color:rgba(156,163,175,.7);font-size:clamp(0.6rem,1.5vw,0.85rem);font-weight:700;letter-spacing:0.3em;text-transform:uppercase;margin-top:-8px}
+    #lcp-shell .btns{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap;justify-content:center}
+    #lcp-shell .btn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:24px;padding:20px 32px;color:#fff;font-size:1.4rem;font-weight:900;min-width:180px;text-align:center}
+  </style>
 </head>
 
 
 <body>
   <noscript>You need to enable JavaScript to run this app.</noscript>
+
+  <!-- Static LCP Shell: visible INSTANTLY at first paint — React removes it once loaded.
+       This is the "largest contentful element" so LCP is measured at page load, not after JS executes. -->
+  <div id="lcp-shell" aria-hidden="true">
+    <div class="bars">
+      <div class="bar"></div>
+      <div class="icon">🎱</div>
+      <div class="bar"></div>
+    </div>
+    <h1>POOL <span>PRO</span></h1>
+    <p class="sub">Championship Series</p>
+    <div class="btns">
+      <div class="btn">PVP MODE</div>
+      <div class="btn">PVC MODE</div>
+    </div>
+  </div>
+
   <div id="root"></div>
+
+  <!-- Remove static shell the moment React renders into #root (zero CLS — shell is position:fixed) -->
+  <script>
+    (function(){
+      var shell=document.getElementById('lcp-shell');
+      if(!shell)return;
+      var root=document.getElementById('root');
+      var observer=new MutationObserver(function(){
+        if(root.children.length>0){
+          shell.style.display='none';
+          observer.disconnect();
+        }
+      });
+      observer.observe(root,{childList:true});
+    })();
+  </script>
 </body>
 
 </html>
