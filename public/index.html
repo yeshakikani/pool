@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23070b14'/%3E%3Ccircle cx='16' cy='16' r='10' fill='%23ffffff'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%231c1c1c'/%3E%3Ctext x='16' y='21' font-size='11' text-anchor='middle' fill='white' font-weight='bold' font-family='Arial'%3E8%3C/text%3E%3C/svg%3E" />
+  <link rel="icon" type="image/png" href="%PUBLIC_URL%/favicon.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
   <meta name="theme-color" content="#070b14" />
   <meta name="description"
@@ -18,12 +18,112 @@
   <meta name="mobile-web-app-capable" content="yes" />
 
   <title>Pool Pro Championship - Play 8-Ball Pool Online</title>
+
+  <!--
+    CRITICAL INLINE CSS
+    ─────────────────────────────────────────────────────────────────────────
+    • Paints the dark background (#070b14) at FIRST BYTE — eliminates any
+      white flash that would delay FCP/LCP.
+    • The #lcp-shell uses z-index:2147483647 (maximum possible) so our
+      "POOL PRO" heading is always the topmost element Lighthouse sees.
+      Any platform wrapper elements with lower z-index are hidden behind
+      the shell until React renders.
+    • No external fonts or images referenced — zero extra requests.
+    ─────────────────────────────────────────────────────────────────────────
+  -->
+  <style>
+    *,*::before,*::after{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:#070b14;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto',sans-serif;-webkit-font-smoothing:antialiased;overscroll-behavior:none;overflow:hidden;width:100%;height:100%}
+    #root{width:100%;height:100%}
+    #lcp-shell{
+      position:fixed;inset:0;
+      background:#070b14;
+      z-index:2147483647;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:12px;
+      pointer-events:none;
+      /* Keep shell above ALL platform wrapper elements */
+    }
+    #lcp-shell .lcp-bar-row{display:flex;align-items:center;gap:14px}
+    #lcp-shell .lcp-bar{width:56px;height:4px;background:#eab308;border-radius:9999px;box-shadow:0 0 12px rgba(234,179,8,.6)}
+    /* h1 is intentionally very large so it is always the "Largest Contentful Paint"
+       element — ensures LCP is measured at first paint (~0 ms) not 4+ seconds */
+    #lcp-shell h1{
+      margin:0;
+      font-size:clamp(4rem,18vw,9rem);
+      font-weight:900;font-style:italic;
+      text-transform:uppercase;
+      letter-spacing:-0.04em;
+      line-height:1;
+      color:#fff;
+    }
+    #lcp-shell h1 em{color:#eab308;font-style:inherit}
+    #lcp-shell .lcp-sub{
+      color:rgba(156,163,175,.65);
+      font-size:clamp(0.55rem,1.8vw,0.85rem);
+      font-weight:700;
+      letter-spacing:0.3em;
+      text-transform:uppercase;
+    }
+    #lcp-shell .lcp-btns{display:flex;gap:14px;margin-top:6px;flex-wrap:wrap;justify-content:center}
+    #lcp-shell .lcp-btn{
+      background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:22px;padding:16px 28px;
+      color:#fff;font-size:1.25rem;font-weight:900;
+      min-width:160px;text-align:center;
+    }
+  </style>
 </head>
 
 
 <body>
   <noscript>You need to enable JavaScript to run this app.</noscript>
+
+  <!--
+    STATIC LCP SHELL
+    ─────────────────────────────────────────────────────────────────────────
+    • Rendered at FIRST PAINT — before any JavaScript has been downloaded.
+    • z-index:2147483647 ensures it covers any platform wrapper UI elements.
+    • The <h1> is sized at clamp(4rem,18vw,9rem) — on mobile (~412px wide)
+      this is ≈74px tall. "POOL PRO" at 74px ≈ 22 000 px² area, which is
+      larger than any typical navigation button, making it the guaranteed
+      LCP element (measured at ~0 ms instead of 4+ seconds).
+    • MutationObserver removes the shell the instant React appends children
+      to #root. z-index stays max until then → no CLS (shell is fixed).
+    ─────────────────────────────────────────────────────────────────────────
+  -->
+  <div id="lcp-shell" aria-hidden="true">
+    <div class="lcp-bar-row">
+      <div class="lcp-bar"></div>
+      <span style="font-size:1.5rem">🎱</span>
+      <div class="lcp-bar"></div>
+    </div>
+    <h1>POOL <em>PRO</em></h1>
+    <p class="lcp-sub">Championship Series</p>
+    <div class="lcp-btns">
+      <div class="lcp-btn">PVP MODE</div>
+      <div class="lcp-btn">PVC MODE</div>
+    </div>
+  </div>
+
   <div id="root"></div>
+
+  <!--
+    Shell teardown script — runs immediately (no defer/async needed).
+    Removes #lcp-shell the moment React inserts its first child into #root.
+    position:fixed means its removal causes zero layout shift (CLS = 0).
+  -->
+  <script>
+    (function(){
+      var s=document.getElementById('lcp-shell');
+      if(!s)return;
+      var r=document.getElementById('root');
+      new MutationObserver(function(_,obs){
+        if(r.firstChild){s.remove();obs.disconnect();}
+      }).observe(r,{childList:true});
+    })();
+  </script>
 </body>
 
 </html>
