@@ -429,11 +429,11 @@ const PoolGame = () => {
 
         for (const ball of balls) {
           if (ball.pocketed || ball === ignoreBall1 || ball === ignoreBall2) continue;
-          
+
           const bx = ball.x - startX;
           const by = ball.y - startY;
           const proj = bx * ux + by * uy;
-          
+
           if (proj > 0 && proj < dist) {
             const perpDist = Math.abs(bx * uy - by * ux);
             // Clearance slightly larger than ball diameter
@@ -455,7 +455,7 @@ const PoolGame = () => {
           const distToPocket = Math.sqrt(dx * dx + dy * dy);
           const ux = dx / distToPocket;
           const uy = dy / distToPocket;
-          
+
           const ghostX = target.x - ux * (BALL_RADIUS * 2);
           const ghostY = target.y - uy * (BALL_RADIUS * 2);
 
@@ -482,10 +482,10 @@ const PoolGame = () => {
 
           if (difficulty < minDifficulty) {
             minDifficulty = difficulty;
-            
+
             // Add a very slight human-like margin of error mapped to difficulty
             const error = (Math.random() - 0.5) * (difficulty / 3000);
-            
+
             bestShot = {
               angle: Math.atan2(cueDy, cueDx) + error,
               power: Math.min(100, Math.max(30, (distToPocket + distToGhost) / 5))
@@ -501,19 +501,19 @@ const PoolGame = () => {
 
       // Fallback 1: If no clear pocket, find a legal target ball we can safely nudge
       for (const target of targetBalls) {
-         if (isPathClear(cueBall.x, cueBall.y, target.x, target.y, cueBall, target)) {
-             aiTargetPower = 35 + Math.random() * 20;
-             return Math.atan2(target.y - cueBall.y, target.x - cueBall.x);
-         }
+        if (isPathClear(cueBall.x, cueBall.y, target.x, target.y, cueBall, target)) {
+          aiTargetPower = 35 + Math.random() * 20;
+          return Math.atan2(target.y - cueBall.y, target.x - cueBall.x);
+        }
       }
 
       // Fallback 2: Desperate shot — shoot somewhere towards a target ball
       const fallbackTarget = targetBalls[Math.floor(Math.random() * targetBalls.length)];
       if (fallbackTarget) {
-         aiTargetPower = 40 + Math.random() * 30;
-         return Math.atan2(fallbackTarget.y - cueBall.y, fallbackTarget.x - cueBall.x);
+        aiTargetPower = 40 + Math.random() * 30;
+        return Math.atan2(fallbackTarget.y - cueBall.y, fallbackTarget.x - cueBall.x);
       }
-      
+
       aiTargetPower = 40;
       return 0;
     };
@@ -1220,7 +1220,7 @@ const PoolGame = () => {
             <line x1="4" y1="12" x2="20" y2="12" />
             <line x1="4" y1="18" x2="20" y2="18" />
           </svg>
-          <span className="hidden md:inline">MENU</span>
+          <span className="hidden md:inline">HOME</span>
         </button>
 
         <div className="bg-black/40 px-3 sm:px-8 py-1 rounded-full border border-yellow-500/30 mx-2" role="status" aria-live="polite" aria-atomic="true">
@@ -1483,7 +1483,7 @@ const PoolGame = () => {
                 className="text-white/40 hover:text-white font-bold transition-all uppercase tracking-[0.3em] py-2"
                 style={{ fontSize: '10px' }}
               >
-                Back to Menu
+                Back to Home
               </button>
             </div>
           </div>
