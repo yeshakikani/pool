@@ -3,15 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-
-  <!--
-    FAVICON: Inline SVG data URI → zero bytes on the wire (no HTTP request).
-    Previous favicon.png was 425 KB which consumed ~2 seconds of bandwidth
-    on Lighthouse's slow-4G simulation, starving the JS/CSS bundles.
-  -->
-  <link rel="icon" type="image/svg+xml"
-    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23070b14'/%3E%3Ccircle cx='16' cy='16' r='10' fill='%23ffffff'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%231c1c1c'/%3E%3Ctext x='16' y='21' font-size='11' text-anchor='middle' fill='white' font-weight='bold' font-family='Arial'%3E8%3C/text%3E%3C/svg%3E" />
-
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23070b14'/%3E%3Ccircle cx='16' cy='16' r='10' fill='%23ffffff'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%231c1c1c'/%3E%3Ctext x='16' y='21' font-size='11' text-anchor='middle' fill='white' font-weight='bold' font-family='Arial'%3E8%3C/text%3E%3C/svg%3E" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
   <meta name="theme-color" content="#070b14" />
   <meta name="description"
@@ -26,105 +18,12 @@
   <meta name="mobile-web-app-capable" content="yes" />
 
   <title>Pool Pro Championship - Play 8-Ball Pool Online</title>
-
-  <!--
-    CRITICAL INLINE CSS
-    ─────────────────────────────────────────────────────────────────────────
-    • Paints #070b14 at FIRST BYTE — zero white flash.
-    • #lcp-shell uses z-index:2147483647 so our <h1> is the topmost element;
-      any platform wrapper elements (e.g. "RETURN TO BASE") are behind it.
-    • h1 at clamp(4rem,18vw,9rem) → ~74px on mobile = ~22 000px² area,
-      larger than any nav button → guaranteed to be the LCP element at ~0ms.
-    ─────────────────────────────────────────────────────────────────────────
-  -->
-  <style>
-    *,*::before,*::after{box-sizing:border-box}
-    html,body{margin:0;padding:0;background:#070b14;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Roboto',sans-serif;-webkit-font-smoothing:antialiased;overscroll-behavior:none;overflow:hidden;width:100%;height:100%}
-    #root{width:100%;height:100%}
-    #lcp-shell{
-      position:fixed;inset:0;
-      background:#070b14;
-      z-index:2147483647;
-      display:flex;flex-direction:column;
-      align-items:center;justify-content:center;
-      gap:12px;
-      pointer-events:none;
-      will-change:opacity;
-    }
-    #lcp-shell .lcp-bar-row{display:flex;align-items:center;gap:14px}
-    #lcp-shell .lcp-bar{width:56px;height:4px;background:#eab308;border-radius:9999px;box-shadow:0 0 12px rgba(234,179,8,.6)}
-    #lcp-shell h1{
-      margin:0;
-      font-size:clamp(4rem,18vw,9rem);
-      font-weight:900;font-style:italic;
-      text-transform:uppercase;
-      letter-spacing:-0.04em;
-      line-height:1;color:#fff;
-    }
-    #lcp-shell h1 em{color:#eab308;font-style:inherit}
-    #lcp-shell .lcp-sub{
-      color:rgba(156,163,175,.65);
-      font-size:clamp(0.55rem,1.8vw,0.85rem);
-      font-weight:700;letter-spacing:0.3em;text-transform:uppercase;
-    }
-    #lcp-shell .lcp-btns{display:flex;gap:14px;margin-top:6px;flex-wrap:wrap;justify-content:center}
-    #lcp-shell .lcp-btn{
-      background:rgba(255,255,255,.05);
-      border:1px solid rgba(255,255,255,.12);
-      border-radius:22px;padding:16px 28px;
-      color:#fff;font-size:1.25rem;font-weight:900;
-      min-width:160px;text-align:center;
-    }
-    /* Smooth fade-out when React takes over — prevents visual jump → better Speed Index */
-    #lcp-shell.fading{
-      opacity:0;
-      transition:opacity 0.25s ease-out;
-    }
-  </style>
 </head>
 
 
 <body>
   <noscript>You need to enable JavaScript to run this app.</noscript>
-
-  <!--
-    STATIC LCP SHELL — renders at ZERO ms, before any JS runs.
-    React replaces it seamlessly once loaded.
-  -->
-  <div id="lcp-shell" aria-hidden="true">
-    <div class="lcp-bar-row">
-      <div class="lcp-bar"></div>
-      <span style="font-size:1.5rem" aria-hidden="true">🎱</span>
-      <div class="lcp-bar"></div>
-    </div>
-    <h1>POOL <em>PRO</em></h1>
-    <p class="lcp-sub">Championship Series</p>
-    <div class="lcp-btns">
-      <div class="lcp-btn">PVP MODE</div>
-      <div class="lcp-btn">PVC MODE</div>
-    </div>
-  </div>
-
   <div id="root"></div>
-
-  <!--
-    Shell teardown: fade out smoothly when React inserts its first child.
-    Smooth transition → no visual snap → better Speed Index score.
-    position:fixed removal → CLS stays 0.
-  -->
-  <script>
-    (function(){
-      var s=document.getElementById('lcp-shell');
-      if(!s)return;
-      new MutationObserver(function(_,obs){
-        if(document.getElementById('root').firstChild){
-          obs.disconnect();
-          s.classList.add('fading');
-          setTimeout(function(){s.remove();},260);
-        }
-      }).observe(document.getElementById('root'),{childList:true});
-    })();
-  </script>
 </body>
 
 </html>
